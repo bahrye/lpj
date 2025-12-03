@@ -21,7 +21,7 @@
         white-space: nowrap; /* Mencegah teks turun ke bawah */
     }
 
-    /* KUNCI PERBAIKAN: Scroll Dalam Cell */
+    /* KUNCI PERBAIKAN: Scroll Dalam Cell (Detail Barang) */
     .detail-scroll {
         max-width: 350px;       /* Batas lebar kotak barang */
         overflow-x: auto;       /* Munculkan scrollbar jika teks panjang */
@@ -30,19 +30,36 @@
         scrollbar-width: thin;  /* Scrollbar tipis (Firefox) */
     }
 
+    /* --- TAMBAHAN BARU: Scroll Dalam Cell (Toko & Uraian) --- */
+    .info-scroll {
+        max-width: 180px;       /* Lebar max kolom toko/uraian (sesuaikan jika kurang lebar) */
+        overflow-x: auto;       /* Munculkan scrollbar jika panjang */
+        white-space: nowrap;    /* Paksa satu baris */
+        padding-bottom: 5px;
+        scrollbar-width: thin;
+    }
+
     /* Mempercantik Scrollbar (Chrome/Edge/Safari) */
-    .detail-scroll::-webkit-scrollbar {
+    /* Diterapkan untuk kedua class: detail-scroll dan info-scroll */
+    .detail-scroll::-webkit-scrollbar,
+    .info-scroll::-webkit-scrollbar {
         height: 6px; /* Tinggi scrollbar horizontal */
     }
-    .detail-scroll::-webkit-scrollbar-track {
+    
+    .detail-scroll::-webkit-scrollbar-track,
+    .info-scroll::-webkit-scrollbar-track {
         background: #f1f1f1; 
         border-radius: 3px;
     }
-    .detail-scroll::-webkit-scrollbar-thumb {
+    
+    .detail-scroll::-webkit-scrollbar-thumb,
+    .info-scroll::-webkit-scrollbar-thumb {
         background: #ccc; 
         border-radius: 3px;
     }
-    .detail-scroll::-webkit-scrollbar-thumb:hover {
+    
+    .detail-scroll::-webkit-scrollbar-thumb:hover,
+    .info-scroll::-webkit-scrollbar-thumb:hover {
         background: #999; 
     }
 
