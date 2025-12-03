@@ -85,15 +85,34 @@
         document.getElementById('formRegister').classList.toggle('hidden', type !== 'register');
     }
 
+    // --- UPDATE FUNGSI REGISTER ---
     function handleRegister(e) { 
         e.preventDefault(); 
-        loader(true); 
+        
+        // Pastikan OTP sudah diisi
         const formData = Object.fromEntries(new FormData(e.target));
+        if (!formData.otp_code) {
+            showAlert("Silakan minta dan masukkan kode OTP terlebih dahulu!", "warning");
+            return;
+        }
+
+        loader(true); 
+        
         google.script.run.withSuccessHandler(res => { 
             loader(false); 
-            if(res.status === 'success') { showAlert(res.message, 'success'); switchAuth('login'); } 
-            else { showAlert(res.message, 'danger'); }
-        }).registerUser(formData); 
+            if(res.status === 'success') { 
+                showAlert(res.message, 'success'); 
+                switchAuth('login'); 
+                // Reset form
+                e.target.reset();
+                document.getElementById('divOtpInput').classList.add('hidden');
+                document.getElementById('btnDaftarFinal').disabled = true;
+                document.getElementById('btnKirimOtp').innerText = "Kirim OTP";
+                document.getElementById('btnKirimOtp').disabled = false;
+            } else { 
+                showAlert(res.message, 'danger'); 
+            }
+        }).registerUserVerified(formData); // Kita memanggil fungsi backend baru 'registerUserVerified'
     }
 
     function handleLogin(e) { 
@@ -606,6 +625,54 @@
                 }
             }).generatePDFLaporan(DB_ID, idTrx);
         });
+    }
+
+    // --- FUNGSI BARU: REQUEST OTP ---
+    function requestOtp() {
+        const emailEl = document.getElementById('regEmail');
+        const email = emailEl.value;
+        const btnOtp = document.getElementById('btnKirimOtp');
+
+        if (!email || !email.includes('@')) {
+            showAlert("Mohon isi email yang valid terlebih dahulu!", "warning");
+            return;
+        }
+
+        // UI Loading state
+        btnOtp.disabled = true;
+        btnOtp.innerText = "Mengirim...";
+        loader(true);
+
+        google.script.run.withSuccessHandler(res => {
+            loader(false);
+            if (res.status === 'success') {
+                showAlert(res.message, 'success');
+                
+                // Tampilkan input OTP dan Aktifkan tombol Daftar
+                document.getElementById('divOtpInput').classList.remove('hidden');
+                document.getElementById('btnDaftarFinal').disabled = false;
+                
+                // Ubah tampilan tombol OTP agar user tau sudah dikirim
+                btnOtp.innerText = "Kirim Ulang";
+                
+                // Timer sederhana agar tidak spam (60 detik)
+                let countdown = 60;
+                const timer = setInterval(() => {
+                    btnOtp.innerText = `Tunggu ${countdown}s`;
+                    countdown--;
+                    if (countdown < 0) {
+                        clearInterval(timer);
+                        btnOtp.disabled = false;
+                        btnOtp.innerText = "Kirim Ulang OTP";
+                    }
+                }, 1000);
+                
+            } else {
+                showAlert(res.message, 'danger');
+                btnOtp.disabled = false;
+                btnOtp.innerText = "Kirim OTP";
+            }
+        }).sendOtpRegistration(email);
     }
 
     // Init Empty Row
