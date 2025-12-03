@@ -131,11 +131,11 @@
     // 4. NAVIGATION MANAGER
     // ==========================================
     
+    // --- UPDATE FUNGSI openView ---
     function openView(viewName) {
         document.querySelectorAll('.app-view').forEach(el => el.classList.add('hidden'));
         document.getElementById('view-' + viewName).classList.remove('hidden');
 
-        // Reset mode edit jika user pindah halaman dari transaksi
         if (viewName !== 'transaksi') cancelEditMode(); 
 
         if (viewName === 'sekolah') loadSekolahData();
@@ -143,6 +143,9 @@
         if (viewName === 'transaksi') { loadDropdowns(); loadRiwayat(); }
         if (viewName === 'master') loadMasterTable('Data_Uraian');
         if (viewName === 'pengaturan') loadExistingKop();
+        
+        // TAMBAHAN BARU:
+        if (viewName === 'cetak') loadDaftarCetak();
     }
 
     // ==========================================
@@ -559,6 +562,52 @@
         }
     }
     
+    // --- FUNGSI BARU UNTUK HALAMAN CETAK ---
+
+    function loadDaftarCetak() {
+        const tbody = document.getElementById('tbody_cetak');
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center">Memuat data transaksi...</td></tr>';
+        
+        google.script.run.withSuccessHandler(data => {
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center">Belum ada transaksi.</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = '';
+            data.forEach(trx => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${trx.tanggal}</td>
+                    <td>${trx.toko}</td>
+                    <td>${trx.uraian}</td>
+                    <td class="text-end fw-bold">${formatRupiah(trx.total_trx)}</td>
+                    <td class="text-center">
+                        <button class="btn btn-danger btn-sm" onclick="printLaporan('${trx.id}')">
+                            <i class="fas fa-file-pdf"></i> Cetak PDF (7 Hal)
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }).getRiwayatTransaksiGrouped(DB_ID);
+    }
+
+    function printLaporan(idTrx) {
+        showConfirm("Generate PDF Laporan Lengkap (7 Halaman)? Proses ini memakan waktu beberapa detik.", function() {
+            loader(true);
+            google.script.run.withSuccessHandler(res => {
+                loader(false);
+                if(res.status === 'success') {
+                    // Buka PDF di tab baru
+                    window.open(res.url, '_blank');
+                } else {
+                    showAlert("Gagal: " + res.message, 'danger');
+                }
+            }).generatePDFLaporan(DB_ID, idTrx);
+        });
+    }
+
     // Init Empty Row
     addRow();
 </script>
