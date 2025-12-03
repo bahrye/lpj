@@ -492,43 +492,77 @@ function generatePDFLaporan(dbId, idTrx) {
 
     // 2. Ambil Data Sekolah & Kop
     const sekolah = getDataSekolah(dbId);
-    const kopUrl = getKopSuratUrl(dbId); // Mengembalikan base64 data URI
+    const kopUrl = getKopSuratUrl(dbId); 
     sekolah.kop_base64 = kopUrl;
     
-    // Parse Alamat Sekolah untuk ambil Kotanya (Asumsi format: Jl... , Kab. Bulukumba)
-    sekolah.kota = "Kab. Bulukumba"; // Default
+    sekolah.kota = "Kab. Bulukumba"; 
     if(sekolah.alamat && sekolah.alamat.includes("Kab.")) {
        sekolah.kota = sekolah.alamat.split("Kab.")[1].split(",")[0].trim();
        sekolah.kota = "Kab. " + sekolah.kota;
     }
 
-    // 3. Ambil Data Toko / Tukang
+    // 3. Ambil Data Pihak (Toko atau Tukang)
     let dataToko = {};
     const sToko = ss.getSheetByName("Data_Toko");
+    
     if (sToko) {
       const vals = sToko.getRange(2, 1, sToko.getLastRow(), 6).getValues();
       const found = vals.find(r => r[0] == trx.toko);
       if (found) {
-        dataToko = { nama: found[0], alamat: found[2], telp: found[3], pemilik: found[4], kota: found[5] || sekolah.kota };
+        dataToko = { 
+          nama: found[0], 
+          alamat: found[2], 
+          telp: found[3], 
+          pemilik: found[4], 
+          kota: found[5] || sekolah.kota 
+        };
       } else {
-         // Cari di Tukang jika tidak ada di Toko
          const sTukang = ss.getSheetByName("Data_Tukang");
          if(sTukang) {
             const valsTk = sTukang.getRange(2, 1, sTukang.getLastRow(), 2).getValues();
             const foundTk = valsTk.find(r => r[0] == trx.toko);
-            if(foundTk) dataToko = { nama: foundTk[0], alamat: foundTk[1], telp: "-", pemilik: foundTk[0], kota: sekolah.kota };
+            if(foundTk) {
+              dataToko = { 
+                nama: foundTk[0], 
+                alamat: foundTk[1], 
+                telp: "-", 
+                pemilik: foundTk[0], 
+                kota: sekolah.kota 
+              };
+            }
          }
       }
     }
 
-    // 4. Ambil Data Nomor & Tanggal Surat
+    // 4. Ambil Data Nomor Surat & Tanggal Surat
     const mapNomor = getNomorSuratData(dbId);
     const mapTanggal = getTanggalSuratData(dbId);
     const dataNomor = mapNomor[idTrx] || {};
     const dataTanggal = mapTanggal[idTrx] || {};
 
-    // 5. Setup Template
-    const template = HtmlService.createTemplateFromFile('CetakTemplate');
+    // 5. GABUNGKAN TEMPLATE HTML (PERBAIKAN DI SINI)
+    // Gunakan .getRawContent() agar tag <? ?> terbaca sebagai kode, bukan teks.
+    var htmlContentString = '<!DOCTYPE html><html><head>';
+    
+    // CSS boleh pakai createHtmlOutputFromFile karena isinya cuma style
+    htmlContentString += HtmlService.createHtmlOutputFromFile('CetakCSS').getContent();
+    htmlContentString += '</head><body>';
+    
+    // FILE HTML HARUS PAKAI createTemplateFromFile(...).getRawContent()
+    htmlContentString += HtmlService.createTemplateFromFile('Cetak_1_Permintaan').getRawContent();
+    htmlContentString += HtmlService.createTemplateFromFile('Cetak_2_Penawaran').getRawContent();
+    htmlContentString += HtmlService.createTemplateFromFile('Cetak_3_Pemeriksaan').getRawContent();
+    htmlContentString += HtmlService.createTemplateFromFile('Cetak_4_SerahTerima').getRawContent();
+    htmlContentString += HtmlService.createTemplateFromFile('Cetak_5_Faktur').getRawContent();
+    htmlContentString += HtmlService.createTemplateFromFile('Cetak_6_Pembayaran').getRawContent();
+    htmlContentString += HtmlService.createTemplateFromFile('Cetak_7_Kwitansi').getRawContent();
+    
+    htmlContentString += '</body></html>';
+
+    // 6. Buat Template Object dari String Gabungan tadi
+    const template = HtmlService.createTemplate(htmlContentString);
+
+    // 7. Inject Variabel Data
     template.trx = trx;
     template.items = trx.items;
     template.sekolah = sekolah;
@@ -536,7 +570,7 @@ function generatePDFLaporan(dbId, idTrx) {
     template.nomor = dataNomor;
     template.tanggal = dataTanggal;
 
-    // Helper formatting di dalam HTML
+    // 8. Definisi Fungsi Helper
     template.fmtRupiah = function(n) { 
       return "Rp " + new Intl.NumberFormat('id-ID').format(n); 
     };
@@ -549,27 +583,28 @@ function generatePDFLaporan(dbId, idTrx) {
       const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
       return days[new Date(d).getDay()];
     };
-    template.terbilang = terbilang;
+    template.terbilang = terbilang; 
     template.terbilangTanggal = function(d) {
-       // Konversi sederhana tanggal ke kalimat (bisa diperbaiki untuk full words)
        if(!d) return "";
        return Utilities.formatDate(new Date(d), "GMT+8", "dd MMMM yyyy");
-    }
+    };
 
-    const htmlContent = template.evaluate().getContent();
+    // 9. Evaluasi Template
+    const finalHtml = template.evaluate().getContent();
     
-    // 6. Convert ke PDF
-    const blob = Utilities.newBlob(htmlContent, MimeType.HTML).setName("Laporan_" + idTrx + ".pdf");
-    const pdf = trx.toko + " - " + idTrx + ".pdf";
-    // Trik: Gunakan HTMLService untuk output blob PDF tidak langsung bisa di web app tanpa save ke Drive dulu atau konversi byte
-    // Cara tercepat: Kembalikan base64 pdf
+    // 10. Konversi ke PDF
+    const blob = Utilities.newBlob(finalHtml, MimeType.HTML).setName("Laporan_" + idTrx + ".pdf");
     
-    // Opsi: Simpan sementara di Drive lalu return URL (Lebih stabil untuk file besar)
-    const folder = DriveApp.getFoldersByName("LPJ_Attachments").hasNext() ? DriveApp.getFoldersByName("LPJ_Attachments").next() : DriveApp.createFolder("LPJ_Attachments");
-    const filePDF = folder.createFile(blob.getAs(MimeType.PDF).setName("LPJ_" + trx.toko + ".pdf"));
+    const folderName = "LPJ_Attachments";
+    const folders = DriveApp.getFoldersByName(folderName);
+    const folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+    
+    const pdfName = "LPJ_" + trx.toko.replace(/[^a-zA-Z0-9 ]/g, "") + "_" + trx.tanggal + ".pdf";
+    const filePDF = folder.createFile(blob.getAs(MimeType.PDF).setName(pdfName));
+    
     filePDF.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     
-    return { status: 'success', url: filePDF.getDownloadUrl().replace("&gd=true","") }; // Trik agar preview di browser
+    return { status: 'success', url: filePDF.getDownloadUrl().replace("&gd=true","") };
 
   } catch (e) {
     return { status: 'error', message: e.toString() };
