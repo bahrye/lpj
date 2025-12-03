@@ -126,13 +126,30 @@
         </div>
 
         <div id="view-transaksi" class="app-view hidden">
-          <h3>Input Transaksi Belanja</h3>
+          <h3 id="titleTrx">Input Transaksi Belanja</h3>
+          
           <form id="formTrx" onsubmit="simpanTransaksi(event)">
             <div class="card mb-3 shadow-sm">
+                <div class="card-header">
+                    <ul class="nav nav-tabs card-header-tabs">
+                        <li class="nav-item">
+                            <button class="nav-link active" id="tabBelanja" type="button" onclick="switchTrxMode('belanja')">Belanja (Toko)</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" id="tabTukang" type="button" onclick="switchTrxMode('tukang')">Jasa (Tukang)</button>
+                        </li>
+                    </ul>
+                </div>
+
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-md-3"><label class="form-label">Tanggal</label><input type="date" name="tanggal" id="trxTanggal" class="form-control" required></div>
-                        <div class="col-md-3"><label class="form-label">Toko</label><select name="toko" class="form-select" id="trxToko" required><option value="">Pilih Toko...</option></select></div>
+                        <div class="col-md-3">
+                            <label class="form-label" id="lblPihak">Toko</label>
+                            <select name="toko" class="form-select" id="trxPihak" required>
+                                <option value="">Pilih...</option>
+                            </select>
+                        </div>
                         <div class="col-md-4"><label class="form-label">Uraian</label><select name="uraian" class="form-select" id="trxUraian" required><option value="">Pilih Uraian...</option></select></div>
                         <div class="col-md-2"><label class="form-label">No. Bukti</label><input type="text" name="no_bukti" id="trxBukti" class="form-control"></div>
                     </div>
@@ -162,7 +179,7 @@
                     <thead class="table-light">
                       <tr>
                         <th>Tanggal</th>
-                        <th>Toko</th>
+                        <th>Toko / Pihak</th>
                         <th>Uraian</th>
                         <th style="min-width: 300px;">Detail Barang</th>
                         <th class="text-end">Total</th>
