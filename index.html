@@ -244,22 +244,171 @@
         </div>
         
         <div id="view-master" class="app-view hidden">
-          <h3 class="mb-4">Kelola Data Master</h3>
-          <ul class="nav nav-tabs" id="masterTabs" role="tablist">
-            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-uraian" type="button" onclick="loadMasterTable('Data_Uraian')">Uraian Belanja</button></li>
-            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-toko" type="button" onclick="loadMasterTable('Data_Toko')">Data Toko</button></li>
-            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-tukang" type="button" onclick="loadMasterTable('Data_Tukang')">Data Tukang</button></li>
+          <h3 class="mb-4 border-bottom pb-2"><i class="fas fa-database text-primary"></i> Kelola Data Master</h3>
+          
+          <ul class="nav nav-pills mb-3" id="masterTabs" role="tablist">
+            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-uraian" type="button" onclick="loadMasterTable('Data_Uraian')"><i class="fas fa-list"></i> Uraian Belanja</button></li>
+            <li class="nav-item ms-2"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-toko" type="button" onclick="loadMasterTable('Data_Toko')"><i class="fas fa-store"></i> Data Toko</button></li>
+            <li class="nav-item ms-2"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-tukang" type="button" onclick="loadMasterTable('Data_Tukang')"><i class="fas fa-user-hard-hat"></i> Data Tukang</button></li>
           </ul>
-          <div class="tab-content p-3 border border-top-0 bg-white shadow-sm rounded-bottom">
+
+          <div class="tab-content">
+            
             <div class="tab-pane fade show active" id="tab-uraian">
-                <div class="row"><div class="col-md-4 mb-3"><div class="card bg-light"><div class="card-body"><h6 class="fw-bold">Form Uraian</h6><form onsubmit="simpanMaster(event, 'Data_Uraian')"><input type="hidden" name="rowIndex" id="idx_Data_Uraian"><input type="text" name="kode" id="u_kode" class="form-control mb-2" placeholder="Kode"><input type="text" name="nama" id="u_nama" class="form-control mb-2" placeholder="Nama Uraian" required><button type="submit" class="btn btn-primary w-100 btn-sm" id="btn_Data_Uraian">Simpan</button><button type="button" class="btn btn-secondary w-100 btn-sm mt-1 hidden" id="cancel_Data_Uraian" onclick="resetFormMaster('Data_Uraian')">Batal</button></form></div></div></div><div class="col-md-8"><table class="table table-striped table-sm"><thead><tr class="table-primary"><th>Kode</th><th>Nama</th><th>Aksi</th></tr></thead><tbody id="tbody_Data_Uraian"></tbody></table></div></div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <div class="card form-card-modern">
+                            <div class="card-header bg-primary text-white fw-bold">Form Uraian</div>
+                            <div class="card-body">
+                                <form onsubmit="simpanMaster(event, 'Data_Uraian')">
+                                    <input type="hidden" name="rowIndex" id="idx_Data_Uraian">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Kode Rekening</label>
+                                        <input type="text" name="kode" id="u_kode" class="form-control" placeholder="Contoh: 5.1.02...">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Nama Uraian</label>
+                                        <input type="text" name="nama" id="u_nama" class="form-control" placeholder="Contoh: Belanja ATK" required>
+                                    </div>
+                                    <div class="d-grid gap-2">
+                                        <button type="submit" class="btn btn-primary" id="btn_Data_Uraian"><i class="fas fa-save"></i> Simpan</button>
+                                        <button type="button" class="btn btn-secondary hidden" id="cancel_Data_Uraian" onclick="resetFormMaster('Data_Uraian')">Batal</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-8">
+                        <div class="master-table-scroll">
+                            <table class="table table-striped table-hover mb-0">
+                                <thead class="table-primary text-white">
+                                    <tr><th>Kode</th><th>Nama Uraian</th><th style="width:100px;">Aksi</th></tr>
+                                </thead>
+                                <tbody id="tbody_Data_Uraian"></tbody>
+                            </table>
+                        </div>
+                        <small class="text-muted fst-italic mt-1 d-block">* Tabel dapat discroll ke bawah.</small>
+                    </div>
+                </div>
             </div>
+
             <div class="tab-pane fade" id="tab-toko">
-                 <div class="row"><div class="col-md-4 mb-3"><div class="card bg-light"><div class="card-body"><h6 class="fw-bold">Form Toko</h6><form onsubmit="simpanMaster(event, 'Data_Toko')"><input type="hidden" name="rowIndex" id="idx_Data_Toko"><input type="text" name="nama" id="t_nama" class="form-control form-control-sm mb-1" placeholder="Nama Toko" required><input type="text" name="jenis" id="t_jenis" class="form-control form-control-sm mb-1" placeholder="Jenis (ATK/Bangunan)"><textarea name="alamat" id="t_alamat" class="form-control form-control-sm mb-1" placeholder="Alamat" rows="2"></textarea><input type="text" name="telp" id="t_telp" class="form-control form-control-sm mb-1" placeholder="No. Telp"><input type="text" name="pemilik" id="t_pemilik" class="form-control form-control-sm mb-1" placeholder="Nama Pemilik"><label class="small text-muted">Tanggal TTD</label><input type="date" name="tgl_ttd" id="t_tgl_ttd" class="form-control form-control-sm mb-2"><button type="submit" class="btn btn-primary w-100 btn-sm" id="btn_Data_Toko">Simpan</button><button type="button" class="btn btn-secondary w-100 btn-sm mt-1 hidden" id="cancel_Data_Toko" onclick="resetFormMaster('Data_Toko')">Batal</button></form></div></div></div><div class="col-md-8"><div class="table-responsive"><table class="table table-striped table-sm" style="font-size:0.85rem"><thead><tr class="table-success"><th>Toko & Jenis</th><th>Alamat & Telp</th><th>Pemilik</th><th>Aksi</th></tr></thead><tbody id="tbody_Data_Toko"></tbody></table></div></div></div>
+                 <div class="row">
+                    <div class="col-md-5 mb-3">
+                        <div class="card form-card-modern">
+                            <div class="form-header-modern">
+                                <span><i class="fas fa-store me-2"></i> Form Data Toko</span>
+                            </div>
+                            <div class="card-body p-4">
+                                <form onsubmit="simpanMaster(event, 'Data_Toko')">
+                                    <input type="hidden" name="rowIndex" id="idx_Data_Toko">
+                                    
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-8">
+                                            <label class="form-label fw-bold text-secondary small">Nama Toko</label>
+                                            <input type="text" name="nama" id="t_nama" class="form-control" placeholder="Nama Toko Lengkap" required>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-bold text-secondary small">Jenis</label>
+                                            <select name="jenis" id="t_jenis" class="form-select">
+                                                <option value="ATK">ATK</option>
+                                                <option value="Bangunan">Bangunan</option>
+                                                <option value="Elektronik">Elektronik</option>
+                                                <option value="Konsumsi">Konsumsi</option>
+                                                <option value="Lainnya">Lainnya</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold text-secondary small">Alamat Lengkap</label>
+                                        <textarea name="alamat" id="t_alamat" class="form-control" placeholder="Jl. Raya..." rows="2"></textarea>
+                                    </div>
+
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold text-secondary small">No. Telepon (Teks)</label>
+                                            <input type="text" name="telp" id="t_telp" class="form-control" placeholder="08xx / (021) xxx">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold text-secondary small">Nama Pemilik</label>
+                                            <input type="text" name="pemilik" id="t_pemilik" class="form-control" placeholder="Nama Pemilik">
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-4">
+                                        <label class="form-label fw-bold text-secondary small">Tempat TTD (Kwitansi/Nota)</label>
+                                        <input type="text" name="tempat" id="t_tempat" class="form-control" placeholder="Contoh: Makassar">
+                                        <div class="form-text text-muted" style="font-size: 0.75rem;">* Kota/Lokasi transaksi (bukan Tanggal).</div>
+                                    </div>
+
+                                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                        <button type="button" class="btn btn-outline-secondary hidden flex-fill" id="cancel_Data_Toko" onclick="resetFormMaster('Data_Toko')">Batal</button>
+                                        <button type="submit" class="btn btn-primary flex-fill fw-bold shadow-sm" id="btn_Data_Toko"><i class="fas fa-check-circle"></i> Simpan Toko</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-7">
+                        <div class="master-table-scroll">
+                            <table class="table table-striped table-hover mb-0" style="font-size:0.9rem">
+                                <thead class="table-success">
+                                    <tr>
+                                        <th>Identitas Toko</th>
+                                        <th>Alamat & Kontak</th>
+                                        <th>Pemilik</th>
+                                        <th style="width:80px;">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody_Data_Toko"></tbody>
+                            </table>
+                        </div>
+                        <div class="mt-2 text-end text-muted small">
+                            <i class="fas fa-info-circle"></i> Gunakan scroll di dalam tabel untuk melihat data lainnya.
+                        </div>
+                    </div>
+                </div>
             </div>
+
             <div class="tab-pane fade" id="tab-tukang">
-                <div class="row"><div class="col-md-4 mb-3"><div class="card bg-light"><div class="card-body"><h6 class="fw-bold">Form Tukang</h6><form onsubmit="simpanMaster(event, 'Data_Tukang')"><input type="hidden" name="rowIndex" id="idx_Data_Tukang"><input type="text" name="nama" id="k_nama" class="form-control mb-2" placeholder="Nama" required><textarea name="alamat" id="k_alamat" class="form-control mb-2" placeholder="Alamat" rows="2"></textarea><button type="submit" class="btn btn-primary w-100 btn-sm" id="btn_Data_Tukang">Simpan</button><button type="button" class="btn btn-secondary w-100 btn-sm mt-1 hidden" id="cancel_Data_Tukang" onclick="resetFormMaster('Data_Tukang')">Batal</button></form></div></div></div><div class="col-md-8"><table class="table table-striped table-sm"><thead><tr class="table-warning"><th>Nama</th><th>Alamat</th><th>Aksi</th></tr></thead><tbody id="tbody_Data_Tukang"></tbody></table></div></div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <div class="card form-card-modern">
+                            <div class="card-header bg-warning text-dark fw-bold">Form Tukang</div>
+                            <div class="card-body">
+                                <form onsubmit="simpanMaster(event, 'Data_Tukang')">
+                                    <input type="hidden" name="rowIndex" id="idx_Data_Tukang">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Nama Tukang</label>
+                                        <input type="text" name="nama" id="k_nama" class="form-control" placeholder="Nama Lengkap" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Alamat</label>
+                                        <textarea name="alamat" id="k_alamat" class="form-control" placeholder="Alamat Domisili" rows="3"></textarea>
+                                    </div>
+                                    <div class="d-grid gap-2">
+                                        <button type="submit" class="btn btn-warning" id="btn_Data_Tukang"><i class="fas fa-save"></i> Simpan Tukang</button>
+                                        <button type="button" class="btn btn-secondary hidden" id="cancel_Data_Tukang" onclick="resetFormMaster('Data_Tukang')">Batal</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-8">
+                        <div class="master-table-scroll">
+                            <table class="table table-striped table-hover mb-0">
+                                <thead class="table-warning">
+                                    <tr><th>Nama Tukang</th><th>Alamat</th><th style="width:100px;">Aksi</th></tr>
+                                </thead>
+                                <tbody id="tbody_Data_Tukang"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
+            
           </div>
         </div>
         
