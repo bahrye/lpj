@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  
+  <style>
+    body { overflow-x: hidden; }
+    .hidden { display: none !important; }
+    .loading-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); z-index:9999; display:none; justify-content:center; align-items:center; flex-direction: column;}
+    
+    /* Sidebar Styles */
+    #sidebar-wrapper { min-height: 100vh; margin-left: -15rem; transition: margin .25s ease-out; }
+    #sidebar-wrapper .sidebar-heading { padding: 0.875rem 1.25rem; font-size: 1.2rem; }
+    #wrapper.toggled #sidebar-wrapper { margin-left: 0; }
+    #page-content-wrapper { width: 100%; }
+    
+    .sidebar-btn { text-align: left; padding: 10px 15px; border: none; background: transparent; color: #ccc; width: 100%; }
+    .sidebar-btn:hover, .sidebar-btn.active { background: rgba(255,255,255,0.1); color: #fff; text-decoration: none; }
+    .sidebar-btn i { width: 25px; }
+  </style>
+</head>
+<body class="bg-light">
+
+  <div id="loader" class="loading-overlay">
+    <div class="spinner-border text-primary" role="status"></div>
+    <div class="mt-2 fw-bold">Memproses Data...</div>
+  </div>
+
+  <div id="authContainer" class="container d-flex justify-content-center align-items-center vh-100">
+    <div class="card shadow-lg p-4" style="width: 400px;">
+      <h4 class="text-center mb-3 fw-bold text-primary">SISTEM LPJ BOS</h4>
+      
+      <ul class="nav nav-tabs nav-fill mb-3">
+        <li class="nav-item">
+          <button class="nav-link active" id="btnTabLogin" onclick="switchAuth('login')">Login</button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" id="btnTabReg" onclick="switchAuth('register')">Daftar</button>
+        </li>
+      </ul>
+
+      <form id="formLogin" onsubmit="handleLogin(event)">
+        <div class="mb-3"><input type="email" name="email" class="form-control" placeholder="Email" required></div>
+        <div class="mb-3"><input type="password" name="password" class="form-control" placeholder="Password" required></div>
+        <button type="submit" class="btn btn-primary w-100">Masuk Aplikasi</button>
+      </form>
+
+      <form id="formRegister" class="hidden" onsubmit="handleRegister(event)">
+        <div class="mb-3"><input type="text" name="sekolah" class="form-control" placeholder="Nama Sekolah Lengkap" required></div>
+        <div class="mb-3"><input type="email" name="email" class="form-control" placeholder="Email Aktif" required></div>
+        <div class="mb-3"><input type="password" name="password" class="form-control" placeholder="Password" required></div>
+        <div class="alert alert-info py-2" style="font-size:12px">Database sekolah akan dibuat otomatis setelah registrasi.</div>
+        <button type="submit" class="btn btn-success w-100">Buat Akun & Database</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="d-flex hidden" id="wrapper">
+    <div class="bg-dark text-white border-end" id="sidebar-wrapper" style="width:250px;">
+      <div class="sidebar-heading border-bottom bg-primary">LPJ BOS v2.0</div>
+      <div class="p-3 border-bottom">
+        <small class="text-white-50">Login sebagai:</small><br>
+        <strong id="displaySekolah">Nama Sekolah</strong>
+      </div>
+      <div class="list-group list-group-flush mt-2">
+        <button class="sidebar-btn" onclick="openView('dashboard')"><i class="fas fa-home"></i> Dashboard</button>
+        <button class="sidebar-btn" onclick="openView('sekolah')"><i class="fas fa-school"></i> Data Sekolah</button>
+        <button class="sidebar-btn" onclick="openView('master')"><i class="fas fa-database"></i> Data Master</button>
+        <button class="sidebar-btn" onclick="openView('transaksi')"><i class="fas fa-shopping-cart"></i> Input Transaksi</button>
+        <button class="sidebar-btn" onclick="alert('Fitur Cetak segera hadir!')"><i class="fas fa-print"></i> Cetak Laporan</button>
+        <button class="sidebar-btn text-danger mt-4" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+      </div>
+    </div>
+
+    <div id="page-content-wrapper">
+      <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm">
+        <div class="container-fluid">
+          <button class="btn btn-primary" id="sidebarToggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+        </div>
+      </nav>
+
+      <div class="container-fluid p-4">
+        
+        <div id="view-dashboard" class="app-view">
+          <h3>Ringkasan Keuangan</h3>
+          <div class="row mt-4">
+            <div class="col-md-4">
+              <div class="card text-white bg-success mb-3 shadow">
+                <div class="card-header">Total Belanja</div>
+                <div class="card-body">
+                  <h2 class="card-title" id="dashTotal">Rp 0</h2>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card text-white bg-info mb-3 shadow">
+                <div class="card-header">Jumlah Transaksi</div>
+                <div class="card-body">
+                  <h2 class="card-title" id="dashCount">0</h2>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="view-sekolah" class="app-view hidden">
+          <div class="card shadow">
+            <div class="card-header bg-primary text-white">Identitas Sekolah</div>
+            <div class="card-body">
+              <form id="formSekolah" onsubmit="simpanSekolah(event)">
+                <div class="row">
+                  <div class="col-md-6 mb-3"><label>Nama Kepala Sekolah</label><input type="text" name="kepsek" class="form-control"></div>
+                  <div class="col-md-6 mb-3"><label>NIP Kepala Sekolah</label><input type="text" name="nip_kepsek" class="form-control"></div>
+                  <div class="col-md-6 mb-3"><label>Nama Bendahara</label><input type="text" name="bendahara" class="form-control"></div>
+                  <div class="col-md-6 mb-3"><label>NIP Bendahara</label><input type="text" name="nip_bendahara" class="form-control"></div>
+                  <div class="col-12 mb-3"><label>Alamat Lengkap</label><textarea name="alamat" class="form-control" rows="3"></textarea></div>
+                </div>
+                <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <div id="view-transaksi" class="app-view hidden">
+          <h3>Input Transaksi Belanja</h3>
+          <form id="formTrx" onsubmit="simpanTransaksi(event)">
+            <div class="card mb-3 shadow-sm">
+              <div class="card-body">
+                <div class="row g-3">
+                  <div class="col-md-3">
+                    <label class="form-label">Tanggal Transaksi</label>
+                    <input type="date" name="tanggal" class="form-control" required>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">Toko</label>
+                    <select name="toko" class="form-select" id="trxToko" required><option value="">Pilih Toko...</option></select>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Uraian Belanja (Kegiatan)</label>
+                    <select name="uraian" class="form-select" id="trxUraian" required><option value="">Pilih Uraian...</option></select>
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label">No. Bukti</label>
+                    <input type="text" name="no_bukti" class="form-control" placeholder="Auto/Manual">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card shadow-sm">
+              <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <span class="fw-bold">Rincian Barang</span>
+                <button type="button" class="btn btn-sm btn-success" onclick="addRow()"><i class="fas fa-plus"></i> Tambah Barang</button>
+              </div>
+              <div class="card-body p-0">
+                <table class="table table-bordered mb-0 align-middle">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Nama Barang</th>
+                      <th width="100">Vol</th>
+                      <th width="100">Sat</th>
+                      <th width="150">Harga Satuan</th>
+                      <th width="150">Total</th>
+                      <th width="50">#</th>
+                    </tr>
+                  </thead>
+                  <tbody id="trxBody">
+                    </tbody>
+                  <tfoot class="table-light">
+                    <tr>
+                      <td colspan="4" class="text-end fw-bold">GRAND TOTAL:</td>
+                      <td class="fw-bold" id="grandTotal">0</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              <div class="card-footer">
+                <button type="submit" class="btn btn-primary w-100 btn-lg">SIMPAN DATA TRANSAKSI</button>
+              </div>
+            </div>
+          </form>
+        </div>
+        
+        <div id="view-master" class="app-view hidden">
+          <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Tambah Data Toko</div>
+                    <div class="card-body">
+                        <form onsubmit="simpanMaster(event, 'Data_Toko')">
+                            <input type="text" name="nama" class="form-control mb-2" placeholder="Nama Toko" required>
+                            <input type="text" name="jenis" class="form-control mb-2" placeholder="Jenis Toko">
+                            <input type="text" name="alamat" class="form-control mb-2" placeholder="Alamat">
+                            <button class="btn btn-sm btn-primary">Simpan Toko</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Tambah Uraian Belanja</div>
+                    <div class="card-body">
+                        <form onsubmit="simpanMaster(event, 'Data_Uraian')">
+                            <input type="text" name="kode" class="form-control mb-2" placeholder="Kode Rekening">
+                            <input type="text" name="nama" class="form-control mb-2" placeholder="Nama Uraian Belanja" required>
+                            <button class="btn btn-sm btn-primary">Simpan Uraian</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- STATE MANAGEMENT ---
+    let DB_ID = localStorage.getItem('bos_db_id');
+    let SEKOLAH_NAMA = localStorage.getItem('bos_sekolah_nama');
+
+    // Init Check
+    if(DB_ID) {
+      initDashboard();
+    } else {
+      document.getElementById('authContainer').classList.remove('hidden');
+    }
+
+    // --- UI HELPER ---
+    function loader(show) {
+      document.getElementById('loader').style.display = show ? 'flex' : 'none';
+    }
+
+    function toggleSidebar() {
+      document.getElementById('wrapper').classList.toggle('toggled');
+      // Fix for sidebar margin logic
+      const el = document.getElementById('sidebar-wrapper');
+      if(document.getElementById('wrapper').classList.contains('toggled')){
+         el.style.marginLeft = "0";
+      } else {
+         el.style.marginLeft = "-15rem";
+      }
+    }
+
+    function switchAuth(type) {
+        document.getElementById('btnTabLogin').classList.toggle('active', type === 'login');
+        document.getElementById('btnTabReg').classList.toggle('active', type === 'register');
+        
+        if(type === 'login') {
+            document.getElementById('formLogin').classList.remove('hidden');
+            document.getElementById('formRegister').classList.add('hidden');
+        } else {
+            document.getElementById('formLogin').classList.add('hidden');
+            document.getElementById('formRegister').classList.remove('hidden');
+        }
+    }
+
+    function openView(viewName) {
+      document.querySelectorAll('.app-view').forEach(el => el.classList.add('hidden'));
+      document.getElementById('view-' + viewName).classList.remove('hidden');
+      
+      // Load Data Spesifik
+      if(viewName === 'sekolah') loadSekolahData();
+      if(viewName === 'dashboard') loadStats();
+      if(viewName === 'transaksi') loadDropdowns();
+    }
+
+    // --- AUTH FUNCTIONS ---
+    function handleRegister(e) {
+      e.preventDefault();
+      loader(true);
+      const formData = Object.fromEntries(new FormData(e.target).entries());
+      
+      google.script.run.withSuccessHandler(res => {
+        loader(false);
+        alert(res.message);
+        if(res.status === 'success') switchAuth('login');
+      }).registerUser(formData);
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      loader(true);
+      const formData = Object.fromEntries(new FormData(e.target).entries());
+
+      google.script.run.withSuccessHandler(res => {
+        loader(false);
+        if(res.status === 'success') {
+          DB_ID = res.token;
+          SEKOLAH_NAMA = res.sekolah;
+          localStorage.setItem('bos_db_id', DB_ID);
+          localStorage.setItem('bos_sekolah_nama', SEKOLAH_NAMA);
+          initDashboard();
+        } else {
+          alert(res.message);
+        }
+      }).loginUser(formData);
+    }
+
+    function logout() {
+      if(confirm('Yakin ingin keluar?')) {
+        localStorage.clear();
+        location.reload();
+      }
+    }
+
+    function initDashboard() {
+      document.getElementById('authContainer').classList.add('hidden');
+      document.getElementById('wrapper').classList.remove('hidden');
+      document.getElementById('displaySekolah').innerText = SEKOLAH_NAMA;
+      toggleSidebar(); // Show sidebar
+      openView('dashboard');
+    }
+
+    // --- DATA HANDLING ---
+    function loadStats() {
+      google.script.run.withSuccessHandler(res => {
+        document.getElementById('dashTotal').innerText = "Rp " + res.total.toLocaleString();
+        document.getElementById('dashCount').innerText = res.count;
+      }).getDashboardStats(DB_ID);
+    }
+
+    function loadSekolahData() {
+      loader(true);
+      google.script.run.withSuccessHandler(data => {
+        loader(false);
+        const form = document.getElementById('formSekolah');
+        for (const [key, value] of Object.entries(data)) {
+            if(form.elements[key]) form.elements[key].value = value;
+        }
+      }).getDataSekolah(DB_ID);
+    }
+
+    function simpanSekolah(e) {
+      e.preventDefault();
+      loader(true);
+      const data = Object.fromEntries(new FormData(e.target).entries());
+      google.script.run.withSuccessHandler(res => {
+        loader(false);
+        alert(res);
+      }).saveDataSekolah(DB_ID, data);
+    }
+
+    // --- MASTER DATA & DROPDOWNS ---
+    function loadDropdowns() {
+        google.script.run.withSuccessHandler(res => {
+            const elToko = document.getElementById('trxToko');
+            const elUraian = document.getElementById('trxUraian');
+            
+            elToko.innerHTML = '<option value="">Pilih Toko...</option>';
+            elUraian.innerHTML = '<option value="">Pilih Uraian...</option>';
+            
+            res.toko.forEach(t => elToko.add(new Option(t, t)));
+            res.uraian.forEach(u => elUraian.add(new Option(u, u)));
+        }).getDropdownData(DB_ID);
+    }
+
+    function simpanMaster(e, type) {
+        e.preventDefault();
+        loader(true);
+        // Mapping form ke array sesuai urutan kolom di sheet
+        const f = e.target;
+        let data = [];
+        if(type === 'Data_Toko') data = [f.nama.value, f.jenis.value, f.alamat.value, "", ""]; 
+        if(type === 'Data_Uraian') data = [f.kode.value, f.nama.value];
+        
+        google.script.run.withSuccessHandler(res => {
+            loader(false);
+            alert(res);
+            f.reset();
+        }).saveMasterData(DB_ID, type, data);
+    }
+
+    // --- TRANSAKSI LOGIC (DYNAMIC ROWS) ---
+    function addRow() {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="text" class="form-control form-control-sm i-nama" required></td>
+        <td><input type="number" class="form-control form-control-sm i-vol" oninput="calcRow(this)" required></td>
+        <td><input type="text" class="form-control form-control-sm i-sat" required></td>
+        <td><input type="number" class="form-control form-control-sm i-harga" oninput="calcRow(this)" required></td>
+        <td><input type="text" class="form-control form-control-sm i-total" readonly value="0"></td>
+        <td><button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button></td>
+      `;
+      document.getElementById('trxBody').appendChild(tr);
+    }
+
+    function removeRow(btn) {
+      btn.closest('tr').remove();
+      calcGrandTotal();
+    }
+
+    function calcRow(el) {
+      const row = el.closest('tr');
+      const vol = row.querySelector('.i-vol').value || 0;
+      const harga = row.querySelector('.i-harga').value || 0;
+      row.querySelector('.i-total').value = vol * harga;
+      calcGrandTotal();
+    }
+
+    function calcGrandTotal() {
+      let total = 0;
+      document.querySelectorAll('.i-total').forEach(el => total += Number(el.value));
+      document.getElementById('grandTotal').innerText = "Rp " + total.toLocaleString();
+    }
+
+    function simpanTransaksi(e) {
+      e.preventDefault();
+      
+      const form = e.target;
+      const header = {
+        tanggal: form.tanggal.value,
+        toko: form.toko.value,
+        uraian: form.uraian.value,
+        no_bukti: form.no_bukti.value
+      };
+
+      const items = [];
+      document.querySelectorAll('#trxBody tr').forEach(row => {
+        items.push({
+          nama: row.querySelector('.i-nama').value,
+          vol: row.querySelector('.i-vol').value,
+          sat: row.querySelector('.i-sat').value,
+          harga: row.querySelector('.i-harga').value,
+          total: row.querySelector('.i-total').value
+        });
+      });
+
+      if(items.length === 0) return alert("Belum ada barang yang diinput!");
+
+      loader(true);
+      google.script.run.withSuccessHandler(res => {
+        loader(false);
+        alert(res);
+        form.reset();
+        document.getElementById('trxBody').innerHTML = '';
+        document.getElementById('grandTotal').innerText = '0';
+      }).processTransaksiLengkap(DB_ID, header, items);
+    }
+    
+    // Auto add 1 row on load
+    addRow(); 
+  </script>
+</body>
+</html>
