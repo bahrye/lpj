@@ -632,11 +632,13 @@ function generatePDFLaporan(dbId, idTrx) {
     const kopUrl = getKopSuratUrl(dbId); 
     sekolah.kop_base64 = kopUrl;
     
-    sekolah.kota = "Kab. Bulukumba"; 
-    if(sekolah.alamat && sekolah.alamat.includes("Kab.")) {
-       sekolah.kota = sekolah.alamat.split("Kab.")[1].split(",")[0].trim();
-       sekolah.kota = "Kab. " + sekolah.kota;
-    }
+    // --- UPDATE LOGIKA: GUNAKAN ALAMAT TTD LANGSUNG ---
+    // Variabel sekolah.kota digunakan sebagai lokasi penandatanganan di template
+    // Mengambil langsung dari input 'alamat_ttd'
+    sekolah.kota = sekolah.alamat_ttd || "Kab. Bulukumba"; 
+    
+    // Pastikan sekolah.alamat tidak null untuk mencegah error di Kop (meskipun mungkin kosong/lama)
+    if (!sekolah.alamat) sekolah.alamat = ""; 
 
     // 3. Ambil Data Pihak (Toko atau Tukang)
     let dataToko = {};
@@ -651,7 +653,7 @@ function generatePDFLaporan(dbId, idTrx) {
           alamat: found[2], 
           telp: found[3], 
           pemilik: found[4], 
-          kota: found[5] || sekolah.kota 
+          kota: found[5] || sekolah.kota // Jika Toko tidak punya Tempat TTD, gunakan TTD Sekolah
         };
       } else {
          const sTukang = ss.getSheetByName("Data_Tukang");
