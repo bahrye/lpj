@@ -629,6 +629,7 @@ function generatePDFLaporan(dbId, idTrx) {
       if (found) {
         dataToko = { 
           nama: found[0], 
+          jenis: found[1], // TAMBAHAN BARU: Mengambil Jenis Toko
           alamat: found[2], 
           telp: found[3], 
           pemilik: found[4], 
@@ -641,7 +642,8 @@ function generatePDFLaporan(dbId, idTrx) {
             const foundTk = valsTk.find(r => r[0] == trx.toko);
             if(foundTk) {
               dataToko = { 
-                nama: foundTk[0], 
+                nama: foundTk[0],
+                jenis: "Penyedia Jasa/Tukang", // Default jika tukang
                 alamat: foundTk[1], 
                 telp: "-", 
                 pemilik: foundTk[0], 
