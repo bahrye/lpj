@@ -162,25 +162,83 @@ function registerUserVerified(form) {
   }
 }
 
-// --- LOGIN ---
+// --- UPDATE LOGIN USER (Kode.gs) ---
 function loginUser(form) {
   const ssMaster = SpreadsheetApp.openById(ID_DB_MASTER).getSheetByName("Users");
   const data = ssMaster.getDataRange().getValues();
   
   for (let i = 1; i < data.length; i++) {
-    // Format Baru (Ada NPSN, index 5)
+    // Cek Email & Password (sesuai logika Anda sebelumnya)
+    let isMatch = false;
+    let dbId = "";
+    let sekolahNama = "";
+    let rowIndex = i + 1; // Baris di spreadsheet (1-based)
+
+    // Logika pencocokan (Support format lama & baru sesuai kode Anda)
     if (data[i].length >= 6) { 
        if (data[i][3] == form.email && data[i][4] == form.password) {
-         return { status: "success", token: data[i][5], sekolah: data[i][2] }; 
+         isMatch = true;
+         dbId = data[i][5];
+         sekolahNama = data[i][2];
        }
+    } else if (data[i][2] == form.email && data[i][3] == form.password) {
+       isMatch = true;
+       dbId = data[i][4];
+       sekolahNama = data[i][1];
     }
-    // Format Lama (Tanpa NPSN)
-    if (data[i][2] == form.email && data[i][3] == form.password) {
-       return { status: "success", token: data[i][4], sekolah: data[i][1] }; 
+
+    if (isMatch) {
+      // --- LOGIKA SESI BARU DI SINI ---
+      // 1. Buat Token Unik Baru
+      const sessionToken = Utilities.getUuid();
+      
+      // 2. Simpan Token ke Kolom G (Kolom 7) di baris user tersebut
+      // Pastikan kolom G tersedia, jika tidak script akan menambahkannya
+      ssMaster.getRange(rowIndex, 7).setValue(sessionToken);
+
+      // 3. Kembalikan token ke Client
+      return { 
+        status: "success", 
+        token: dbId, 
+        sekolah: sekolahNama,
+        session_token: sessionToken // Kirim token baru
+      }; 
     }
   }
   
   return { status: "error", message: "Email atau Password salah!" };
+}
+
+// --- FUNGSI CEK SESI (Kode.gs) ---
+function checkSessionStatus(dbId, clientToken) {
+  try {
+    const ssMaster = SpreadsheetApp.openById(ID_DB_MASTER).getSheetByName("Users");
+    const data = ssMaster.getDataRange().getValues();
+    
+    // Cari user berdasarkan dbId (ID Database Unik User)
+    // Kita asumsikan dbId unik per user.
+    for (let i = 1; i < data.length; i++) {
+      // Cek kolom dbId (index 5 untuk format baru, index 4 format lama)
+      let rowDbId = (data[i].length >= 6) ? data[i][5] : data[i][4];
+      
+      if (rowDbId === dbId) {
+        // Ambil token yang tersimpan di server (Kolom G / Index 6)
+        const serverToken = (data[i].length >= 7) ? data[i][6] : "";
+        
+        // Bandingkan token client dengan token server
+        if (serverToken === clientToken) {
+          return { isValid: true };
+        } else {
+          return { isValid: false, message: "Sesi telah kedaluwarsa. Akun login di perangkat lain." };
+        }
+      }
+    }
+    // Jika user tidak ditemukan (aneh, tapi handle saja)
+    return { isValid: false, message: "Akun tidak ditemukan." };
+    
+  } catch (e) {
+    return { isValid: false, message: "Error check session: " + e.toString() };
+  }
 }
 
 // --- DATA SEKOLAH ---
