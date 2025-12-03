@@ -1,0 +1,48 @@
+<div class="page">
+    <div class="kop-img-container">
+      <? if (sekolah.kop_base64) { ?> 
+        <img src="<?= sekolah.kop_base64 ?>" class="kop-img"> 
+      <? } else { ?>
+        <h2 style="margin:0"><?= sekolah.sekolah ?></h2>
+        <p style="margin:0"><?= sekolah.alamat ?></p>
+      <? } ?>
+    </div>
+    <div class="garis-kop"></div>
+
+    <div class="judul-halaman">BERITA ACARA PEMBAYARAN</div>
+    <div class="text-center">Nomor: <?= nomor.bayar || "......................." ?></div>
+    <br>
+    <p class="text-justify">
+      Pada hari ini <b><?= hari(tanggal.bayar || trx.tanggal) ?></b> tanggal <b><?= terbilangTanggal(tanggal.bayar || trx.tanggal) ?></b>, kami yang bertanda tangan dibawah ini:
+    </p>
+    <table style="width: 100%; padding-left: 20px;">
+      <tr><td width="100">1. Nama</td><td>: <?= sekolah.kepsek ?></td></tr>
+      <tr><td>Jabatan</td><td>: Kepala Sekolah (Pihak Pertama)</td></tr>
+    </table>
+    <br>
+    <table style="width: 100%; padding-left: 20px;">
+      <tr><td width="100">2. Nama</td><td>: <?= toko.pemilik ?></td></tr>
+      <tr><td>Jabatan</td><td>: Pimpinan <?= trx.toko ?> (Pihak Kedua)</td></tr>
+    </table>
+    <p class="text-justify">
+      PIHAK PERTAMA telah membayar lunas kepada PIHAK KEDUA sebesar <b><?= fmtRupiah(trx.total_trx) ?></b> untuk pelunasan barang sesuai Berita Acara Pemeriksaan Barang Nomor: <?= nomor.periksa || "-" ?>.
+    </p>
+    <p>Rincian Pembayaran:</p>
+    <table style="width: 100%; margin-left: 20px;">
+      <tr><td width="200">Jumlah Harga Borongan</td><td>: <?= fmtRupiah(trx.total_trx) ?></td></tr>
+      <tr><td>Sisa yang belum dibayar</td><td>: NIHIL</td></tr>
+      <tr><td><b>Jumlah yang dibayarkan</b></td><td>: <b><?= fmtRupiah(trx.total_trx) ?></b></td></tr>
+    </table>
+    <table style="width: 100%; margin-top: 30px;">
+      <tr>
+        <td class="text-center" width="50%">
+          Penerima (Pihak Kedua),<br><div class="ttd-space"></div>
+          <b><u><?= toko.pemilik ?></u></b>
+        </td>
+        <td class="text-center" width="50%">
+          Pembayar (Pihak Pertama),<br><div class="ttd-space"></div>
+          <b><u><?= sekolah.kepsek ?></u></b><br>NIP. <?= sekolah.nip_kepsek ?>
+        </td>
+      </tr>
+    </table>
+</div>
