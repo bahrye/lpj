@@ -46,7 +46,7 @@ function registerUser(form) {
   try {
     const templateFile = DriveApp.getFileById(ID_TEMPLATE);
     const newFile = templateFile.makeCopy("DB BOS - " + form.sekolah);
-    newFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.EDITOR);
+    newFile.addEditor(form.email);
     ssMaster.appendRow([new Date(), form.sekolah, form.email, form.password, newFile.getId()]);
     return { status: "success", message: "Registrasi Berhasil! Silakan Login." };
   } catch (e) {
@@ -54,14 +54,151 @@ function registerUser(form) {
   }
 }
 
+// --- OTP & REGISTRASI BARU ---
+
+// 1. Fungsi Mengirim OTP ke Email
+function sendOtpRegistration(email) {
+  const ssMaster = SpreadsheetApp.openById(ID_DB_MASTER).getSheetByName("Users");
+  const data = ssMaster.getDataRange().getValues();
+  
+  // Cek apakah email sudah terdaftar
+  // Perhatikan: Karena struktur berubah, kita harus pastikan index email dicek dengan benar nanti.
+  // Tapi untuk saat ini kita cek loop manual. 
+  // Jika struktur LAMA: Email index 2. Jika BARU: Email index 3.
+  // Untuk aman, kita asumsikan User belum mengubah sheet, jadi kita cek dua-duanya atau pakai find.
+  
+  for (let i = 1; i < data.length; i++) {
+    // Cek index 2 (lama) atau 3 (baru)
+    if (data[i][2] == email || data[i][3] == email) {
+        return { status: "error", message: "Email sudah terdaftar!" };
+    }
+  }
+
+  // Generate 6 Digit Code
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  
+  // Simpan OTP di Script Properties (Berlaku global untuk script ini)
+  // Format Key: "OTP_emailuser@gmail.com"
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty("OTP_" + email, otp);
+  
+  // Kirim Email
+  try {
+    MailApp.sendEmail({
+      to: email,
+      subject: "Kode Verifikasi - Sistem LPJ BOS",
+      htmlBody: `
+        <h3>Verifikasi Email Pendaftaran</h3>
+        <p>Halo,</p>
+        <p>Berikut adalah kode verifikasi (OTP) untuk pendaftaran akun LPJ BOS Anda:</p>
+        <h2 style="color:blue;">${otp}</h2>
+        <p>Kode ini berlaku untuk sementara. Jangan berikan kepada siapapun.</p>
+        <br>
+        <small>Sistem LPJ BOS Terpadu</small>
+      `
+    });
+    return { status: "success", message: "Kode OTP telah dikirim ke " + email };
+  } catch (e) {
+    return { status: "error", message: "Gagal mengirim email: " + e.toString() };
+  }
+}
+
+function registerUserVerified(form) {
+  const email = form.email;
+  const inputOtp = form.otp_code;
+  
+  const props = PropertiesService.getScriptProperties();
+  const storedOtp = props.getProperty("OTP_" + email);
+  
+  // 1. Validasi OTP
+  if (!storedOtp) return { status: "error", message: "Kode OTP kadaluarsa atau belum diminta." };
+  if (storedOtp !== inputOtp) return { status: "error", message: "Kode OTP Salah!" };
+  
+  props.deleteProperty("OTP_" + email);
+  
+  try {
+    const ssMaster = SpreadsheetApp.openById(ID_DB_MASTER).getSheetByName("Users");
+    
+    // 2. Copy Template
+    const templateFile = DriveApp.getFileById(ID_TEMPLATE);
+    const newFile = templateFile.makeCopy("DB BOS - " + form.sekolah);
+    const newDbId = newFile.getId();
+    
+    // === PERBAIKAN: TRY-CATCH UNTUK IZIN ===
+    // Mencoba memberi akses edit, tapi jika gagal (misal email bukan Google),
+    // proses TIDAK akan berhenti/error. Database tetap jadi.
+    try {
+      newFile.addEditor(form.email);
+    } catch (permErr) {
+      console.log("Peringatan Izin: " + permErr.toString());
+      // Lanjut saja, jangan throw error
+    }
+    // ========================================
+
+    // 3. Inject Data Sekolah
+    try {
+      const ssUser = SpreadsheetApp.openById(newDbId);
+      let sheetSekolah = ssUser.getSheetByName("Data_Sekolah");
+      if (!sheetSekolah) sheetSekolah = ssUser.insertSheet("Data_Sekolah");
+      
+      const existingData = sheetSekolah.getDataRange().getValues();
+      let dataMap = {};
+      existingData.forEach(row => { if(row[0]) dataMap[row[0]] = row[1]; });
+      
+      dataMap['sekolah'] = form.sekolah;
+      dataMap['npsn']    = "'" + form.npsn;
+      
+      const finalData = Object.entries(dataMap);
+      sheetSekolah.clear();
+      if(finalData.length > 0) sheetSekolah.getRange(1, 1, finalData.length, 2).setValues(finalData);
+    } catch (err) {
+      console.error("Gagal inject Data Sekolah: " + err.toString());
+    }
+
+    // 4. Simpan ke Master
+    ssMaster.appendRow([
+      new Date(), 
+      "'" + form.npsn, 
+      form.sekolah, 
+      form.email, 
+      form.password, 
+      newDbId
+    ]);
+    
+    return { status: "success", message: "Registrasi Berhasil! Silakan Login." };
+    
+  } catch (e) {
+    return { status: "error", message: "Gagal membuat database: " + e.toString() };
+  }
+}
+
+// --- UPDATE FUNGSI LOGIN (PENTING!) ---
+// Karena kita menambah kolom NPSN di urutan ke-2 (index 1), maka kolom setelahnya bergeser.
 function loginUser(form) {
   const ssMaster = SpreadsheetApp.openById(ID_DB_MASTER).getSheetByName("Users");
   const data = ssMaster.getDataRange().getValues();
+  
+  // Asumsi Struktur Kolom: 
+  // 0: Date, 1: NPSN, 2: Sekolah, 3: Email, 4: Password, 5: Token/FileId
+  
   for (let i = 1; i < data.length; i++) {
+    // Cek Email (Kolom Index 3) & Password (Kolom Index 4)
+    // KITA PAKAI LOGIKA GANDA UNTUK MENGANTISIPASI DATA LAMA vs BARU
+    
+    // Cek Format Baru (Ada NPSN) - Jika kolom terakhir ada di index 5
+    if (data[i].length >= 6) { 
+       if (data[i][3] == form.email && data[i][4] == form.password) {
+         return { status: "success", token: data[i][5], sekolah: data[i][2] }; 
+       }
+    }
+    
+    // Fallback: Cek Format Lama (Tanpa NPSN) - Jika kolomnya cuma 5
+    // 0: Date, 1: Sekolah, 2: Email, 3: Password, 4: Token
     if (data[i][2] == form.email && data[i][3] == form.password) {
-      return { status: "success", token: data[i][4], sekolah: data[i][1] }; 
+       return { status: "success", token: data[i][4], sekolah: data[i][1] }; 
     }
   }
+  
   return { status: "error", message: "Email atau Password salah!" };
 }
 
@@ -609,4 +746,9 @@ function generatePDFLaporan(dbId, idTrx) {
   } catch (e) {
     return { status: 'error', message: e.toString() };
   }
+}
+
+function cekIzinEmail() {
+  var sisa = MailApp.getRemainingDailyQuota();
+  console.log("Sisa kuota email hari ini: " + sisa);
 }
