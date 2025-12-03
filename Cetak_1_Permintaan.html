@@ -1,11 +1,23 @@
 <div class="page">
     <div class="kop-img-container">
-      <? if (sekolah.kop_base64) { ?>
-        <img src="<?= sekolah.kop_base64 ?>" class="kop-img">
-      <? } else { ?>
-        <h2 style="margin:0; text-transform:uppercase;"><?= sekolah.sekolah ?></h2>
-        <p style="margin:0"><?= sekolah.alamat ?></p>
-      <? } ?>
+      <table style="width: 100%; border: none;">
+        <tr>
+          <? if (sekolah.kop_base64) { ?>
+          <td style="width: 15%; text-align: center; border: none;">
+            <img src="<?= sekolah.kop_base64 ?>" style="max-width: 100px; max-height: 100px;">
+          </td>
+          <? } ?>
+          
+          <td style="text-align: center; border: none;">
+            <h2 style="margin:0; text-transform:uppercase; font-size:16pt;"><?= sekolah.sekolah || "NAMA SEKOLAH BELUM DISET" ?></h2>
+            <p style="margin:0; font-size:11pt;"><?= sekolah.alamat ?></p>
+            <p style="margin:0; font-size:10pt;">Telp: -</p> </td>
+          
+          <? if (sekolah.kop_base64) { ?>
+          <td style="width: 15%; border: none;"></td>
+          <? } ?>
+        </tr>
+      </table>
     </div>
     <div class="garis-kop"></div>
 
