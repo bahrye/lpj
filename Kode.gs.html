@@ -385,3 +385,74 @@ function saveNomorSuratData(dbId, formData) {
     return "Nomor Surat Berhasil Disimpan!";
   } catch (e) { return "Error: " + e.toString(); }
 }
+
+// --- 3. Data Tanggal Surat (BARU) ---
+
+function getTanggalSuratData(dbId) {
+  try {
+    const ss = SpreadsheetApp.openById(dbId);
+    // Pastikan sheet ada. Headers: ID_TRX, Tgl_Masuk, Tgl_Periksa, Tgl_Terima, Tgl_Bayar
+    const sheet = ensureSheetExists(ss, "Data_Tanggal_Surat"); 
+    
+    // Jika header belum ada (baris 1 kosong atau sheet baru)
+    if (sheet.getLastRow() === 0) {
+        sheet.appendRow(["ID_TRX", "Tgl_Masuk", "Tgl_Periksa", "Tgl_Terima", "Tgl_Bayar"]);
+    }
+    
+    const data = sheet.getDataRange().getValues();
+    let map = {};
+    
+    // Helper convert date object to YYYY-MM-DD for HTML input
+    const toYMD = (dateObj) => {
+      if (!dateObj || dateObj === "") return "";
+      try {
+        return Utilities.formatDate(new Date(dateObj), Session.getScriptTimeZone(), "yyyy-MM-dd");
+      } catch (e) { return ""; }
+    };
+
+    for(let i=1; i<data.length; i++) {
+      map[data[i][0]] = {
+        masuk: toYMD(data[i][1]),
+        periksa: toYMD(data[i][2]),
+        terima: toYMD(data[i][3]),
+        bayar: toYMD(data[i][4])
+      };
+    }
+    return map;
+  } catch (e) { return {}; }
+}
+
+function saveTanggalSuratData(dbId, formData) {
+  try {
+    const ss = SpreadsheetApp.openById(dbId);
+    const sheet = ensureSheetExists(ss, "Data_Tanggal_Surat");
+    const data = sheet.getDataRange().getValues();
+    
+    let rowIndex = -1;
+    // Cari baris berdasarkan ID_TRX
+    for(let i=1; i<data.length; i++) {
+      if(data[i][0] == formData.id_trx) {
+        rowIndex = i + 1; 
+        break;
+      }
+    }
+    
+    const rowData = [
+      formData.id_trx, 
+      formData.tgl_masuk,   // Tanggal Surat Masuk (Toko)
+      formData.tgl_periksa, // BA Pemeriksaan
+      formData.tgl_terima,  // BA Serah Terima
+      formData.tgl_bayar    // BA Pembayaran
+    ];
+    
+    if (rowIndex > 0) {
+      // Update data lama
+      sheet.getRange(rowIndex, 1, 1, 5).setValues([rowData]);
+    } else {
+      // Insert data baru
+      sheet.appendRow(rowData);
+    }
+    
+    return "Data Tanggal Berhasil Disimpan!";
+  } catch (e) { return "Error: " + e.toString(); }
+}
