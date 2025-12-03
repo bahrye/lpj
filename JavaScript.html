@@ -35,11 +35,17 @@
       document.getElementById('view-' + viewName).classList.remove('hidden');
       if(viewName === 'sekolah') loadSekolahData();
       if(viewName === 'dashboard') loadStats();
-      if(viewName === 'transaksi') loadDropdowns();
+      
+      // Update: Tambahkan loadRiwayat()
+      if(viewName === 'transaksi') {
+        loadDropdowns();
+        loadRiwayat();
+      }
+
       if(viewName === 'master') loadMasterTable('Data_Uraian');
     }
 
-    // --- LOGIKA DATA MASTER (FIXED) ---
+    // --- LOGIKA DATA MASTER ---
     
     function loadMasterTable(type) {
         const tbody = document.getElementById('tbody_' + type);
@@ -56,7 +62,6 @@
 
             data.forEach((row, index) => {
                 let html = '';
-                // Gunakan index untuk tombol Edit, jangan pass object row langsung (rawan error)
                 const btns = `<td>
                     <button class="btn btn-warning btn-sm py-0 px-1" onclick="editMaster('${type}', ${index})"><i class="fas fa-edit"></i></button>
                     <button class="btn btn-danger btn-sm py-0 px-1" onclick="deleteMaster('${type}', ${index})"><i class="fas fa-trash"></i></button>
@@ -65,7 +70,6 @@
                 if(type === 'Data_Uraian') {
                     html = `<td>${row[0]||''}</td><td>${row[1]||''}</td>${btns}`;
                 } else if(type === 'Data_Toko') {
-                    // Cek kelengkapan data (mencegah undefined)
                     const nama = row[0] || '-';
                     const jenis = row[1] || '';
                     const alamat = row[2] || '-';
@@ -97,7 +101,6 @@
         if(type === 'Data_Uraian') data = [f.kode.value, f.nama.value];
         if(type === 'Data_Tukang') data = [f.nama.value, f.alamat.value];
         if(type === 'Data_Toko') {
-            // Konversi tanggal aman
             let tgl = "";
             if(f.tgl_ttd.value) {
                 try { tgl = new Date(f.tgl_ttd.value).toISOString().slice(0, 10); } catch(err) {}
@@ -114,7 +117,6 @@
     }
 
     function editMaster(type, index) {
-        // Ambil data dari CACHE berdasarkan index
         const rowData = CACHE_DATA[type][index];
         if(!rowData) return;
 
@@ -136,7 +138,6 @@
             document.getElementById('t_telp').value = rowData[3];
             document.getElementById('t_pemilik').value = rowData[4];
             
-            // Handle Tanggal dari Sheet (String ISO atau Object Date)
             let dateVal = "";
             if(rowData[5]) {
                 const d = new Date(rowData[5]);
@@ -181,7 +182,52 @@
     function addRow() { const tr=document.createElement('tr'); tr.innerHTML=`<td><input class="form-control form-control-sm i-nama"></td><td><input type="number" class="form-control form-control-sm i-vol" oninput="cR(this)"></td><td><input class="form-control form-control-sm i-sat"></td><td><input type="number" class="form-control form-control-sm i-harga" oninput="cR(this)"></td><td><input class="form-control form-control-sm i-total" readonly value="0"></td><td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove();cGT()">x</button></td>`; document.getElementById('trxBody').appendChild(tr); }
     function cR(e) { const r=e.closest('tr'), v=r.querySelector('.i-vol').value||0, h=r.querySelector('.i-harga').value||0; r.querySelector('.i-total').value=v*h; cGT(); }
     function cGT() { let t=0; document.querySelectorAll('.i-total').forEach(e=>t+=Number(e.value)); document.getElementById('grandTotal').innerText=t.toLocaleString(); }
-    function simpanTransaksi(e) { e.preventDefault(); const f=e.target, h={tanggal:f.tanggal.value, toko:f.toko.value, uraian:f.uraian.value, no_bukti:f.no_bukti.value}, it=[]; document.querySelectorAll('#trxBody tr').forEach(r=>{ it.push({nama:r.querySelector('.i-nama').value, vol:r.querySelector('.i-vol').value, sat:r.querySelector('.i-sat').value, harga:r.querySelector('.i-harga').value, total:r.querySelector('.i-total').value})}); if(it.length===0) return alert("Kosong"); loader(true); google.script.run.withSuccessHandler(r=>{ loader(false); alert(r); f.reset(); document.getElementById('trxBody').innerHTML=''; cGT(); addRow(); }).processTransaksiLengkap(DB_ID, h, it); }
+    
+    function simpanTransaksi(e) { 
+        e.preventDefault(); 
+        const f=e.target, h={tanggal:f.tanggal.value, toko:f.toko.value, uraian:f.uraian.value, no_bukti:f.no_bukti.value}, it=[]; 
+        document.querySelectorAll('#trxBody tr').forEach(r=>{ it.push({nama:r.querySelector('.i-nama').value, vol:r.querySelector('.i-vol').value, sat:r.querySelector('.i-sat').value, harga:r.querySelector('.i-harga').value, total:r.querySelector('.i-total').value})}); 
+        if(it.length===0) return alert("Kosong"); 
+        loader(true); 
+        google.script.run.withSuccessHandler(r=>{ 
+            loader(false); 
+            alert(r); 
+            f.reset(); 
+            document.getElementById('trxBody').innerHTML=''; 
+            cGT(); 
+            addRow();
+            
+            // Update: Reload tabel riwayat setelah simpan
+            loadRiwayat();
+            
+        }).processTransaksiLengkap(DB_ID, h, it); 
+    }
+
+    // --- FUNGSI BARU: LOAD RIWAYAT TRANSAKSI ---
+    function loadRiwayat() {
+        const tbody = document.getElementById('tbody_riwayat');
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center"><div class="spinner-border spinner-border-sm text-primary"></div> Memuat...</td></tr>';
+        
+        google.script.run.withSuccessHandler(data => {
+            tbody.innerHTML = '';
+            if(!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Belum ada data transaksi.</td></tr>';
+                return;
+            }
+            
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><small>${row.tanggal}</small></td>
+                    <td>${row.toko}</td>
+                    <td>${row.uraian}</td>
+                    <td>${row.barang}</td>
+                    <td class="text-end fw-bold">${Number(row.total).toLocaleString('id-ID')}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }).getRiwayatTransaksi(DB_ID);
+    }
     
     addRow();
 </script>
