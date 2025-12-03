@@ -447,7 +447,15 @@ function getKopSuratUrl(dbId) {
     if (fileId) {
       const file = DriveApp.getFileById(fileId);
       const blob = file.getBlob();
-      return "data:" + blob.getContentType() + ";base64," + Utilities.base64Encode(blob.getBytes());
+      
+      // FIX: Memaksa pengecekan MimeType agar valid
+      let mime = blob.getContentType();
+      if (!mime.startsWith("image/")) {
+         // Jika terdeteksi bukan image (misal application/octet-stream), paksa jadi png
+         mime = "image/png"; 
+      }
+
+      return "data:" + mime + ";base64," + Utilities.base64Encode(blob.getBytes());
     }
     return null;
   } catch(e) { return null; }
