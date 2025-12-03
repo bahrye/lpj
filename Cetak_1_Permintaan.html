@@ -99,7 +99,8 @@
         <?= sekolah.kota ?>, <?= fmtDate(nomor.tgl_surat_keluar || trx.tanggal) ?><br>
         Hormat Kami,<br>
         <div class="ttd-space"></div>
-        <b class="text-underline"><?= sekolah.bendahara ?></b>
+        <b class="text-underline"><?= trx.pemesan ?></b><br>
+        NIP. <?= trx.nip_pemesan || "-" ?>
       </div>
     </div>
 </div>
