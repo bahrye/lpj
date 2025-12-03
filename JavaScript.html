@@ -16,6 +16,7 @@
     };
     
     let CACHE_NOMOR_SURAT = {}; // Cache baru untuk nomor surat
+    let CACHE_TANGGAL_SURAT = {}; // Cache baru untuk tanggal surat
 
     if (DB_ID) { 
         initDashboard(); 
@@ -537,6 +538,114 @@
             loadPengaturanNomor();
             alert(res);
         }).saveNomorSuratData(DB_ID, data);
+    }
+
+    // --- C. PENGATURAN TANGGAL (BARU) ---
+    
+    // Dipanggil saat klik tab "Pengaturan Tanggal"
+    // (Anda perlu mengubah onclick di HTML tab tanggal menjadi: onclick="loadPengaturanTanggal()")
+    function loadPengaturanTanggal() {
+        const tbody = document.getElementById('tbody_setting_tanggal');
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center"><div class="spinner-border spinner-border-sm"></div> Memuat data transaksi...</td></tr>';
+        
+        // 1. Ambil list transaksi (Grouped)
+        google.script.run.withSuccessHandler(trxData => {
+            // 2. Ambil data tanggal yang tersimpan
+            google.script.run.withSuccessHandler(tanggalData => {
+                CACHE_TANGGAL_SURAT = tanggalData; 
+                renderTableTanggal(trxData, tanggalData);
+            }).getTanggalSuratData(DB_ID);
+        }).getRiwayatTransaksiGrouped(DB_ID);
+    }
+
+    function renderTableTanggal(trxList, tanggalMap) {
+        const tbody = document.getElementById('tbody_setting_tanggal');
+        tbody.innerHTML = '';
+        
+        if (!trxList || trxList.length === 0) { 
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">Belum ada transaksi. Input transaksi dulu.</td></tr>'; 
+            return; 
+        }
+
+        trxList.forEach(trx => {
+            const id = trx.id;
+            const saved = tanggalMap[id];
+            
+            // Cek kelengkapan (misal: jika tgl bayar ada, dianggap sudah diisi)
+            let statusBadge = '<span class="badge bg-danger">Belum Diisi</span>';
+            if (saved && saved.bayar) statusBadge = '<span class="badge bg-success">Sudah Diisi</span>';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${trx.tanggal}</td>
+                <td>${trx.toko}</td>
+                <td>${trx.uraian}</td>
+                <td class="text-center">${statusBadge}</td>
+                <td class="text-center">
+                    <button class="btn btn-warning btn-sm" onclick="openModalTanggal('${id}', '${trx.toko}')">
+                        <i class="fas fa-calendar-day"></i> Set Tanggal
+                    </button>
+                </td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function openModalTanggal(trxId, pihakName) {
+        document.getElementById('formTanggalSurat').reset();
+        document.getElementById('ts_id_trx').value = trxId;
+        
+        // Cek apakah Tukang atau Toko (Logika sama dengan Nomor Surat)
+        let isTukang = false;
+        if (CACHE_DROPDOWNS.tukang && CACHE_DROPDOWNS.tukang.includes(pihakName)) isTukang = true;
+        
+        document.getElementById('ts_jenis_pihak').value = isTukang ? 'tukang' : 'toko';
+        
+        // Atur Label (Barang vs Pekerjaan) & Hide Input Nota
+        if (isTukang) {
+            document.getElementById('div_ts_masuk').classList.add('hidden'); // Sembunyikan tgl nota toko
+            document.getElementById('lbl_ts_periksa').innerText = "Pekerjaan"; 
+            document.getElementById('lbl_ts_terima').innerText = "Pekerjaan";  
+        } else {
+            document.getElementById('div_ts_masuk').classList.remove('hidden');
+            document.getElementById('lbl_ts_periksa').innerText = "Barang";
+            document.getElementById('lbl_ts_terima').innerText = "Barang";
+        }
+
+        // Isi data jika sudah ada di Cache
+        const saved = CACHE_TANGGAL_SURAT[trxId];
+        if (saved) {
+            document.getElementById('ts_masuk').value = saved.masuk || '';
+            document.getElementById('ts_periksa').value = saved.periksa || '';
+            document.getElementById('ts_terima').value = saved.terima || '';
+            document.getElementById('ts_bayar').value = saved.bayar || '';
+        }
+
+        const myModal = new bootstrap.Modal(document.getElementById('modalTanggalSurat'));
+        myModal.show();
+    }
+
+    function simpanTanggalSurat(e) {
+        e.preventDefault();
+        loader(true);
+        
+        const f = e.target;
+        const data = { 
+            id_trx: f.id_trx.value, 
+            tgl_masuk: f.tgl_masuk.value, 
+            tgl_periksa: f.tgl_periksa.value, 
+            tgl_terima: f.tgl_terima.value, 
+            tgl_bayar: f.tgl_bayar.value 
+        };
+        
+        google.script.run.withSuccessHandler(res => {
+            loader(false);
+            const modalEl = document.getElementById('modalTanggalSurat');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            modal.hide();
+            
+            loadPengaturanTanggal(); // Reload tabel
+            alert(res);
+        }).saveTanggalSuratData(DB_ID, data);
     }
     
     // Init Empty Row
