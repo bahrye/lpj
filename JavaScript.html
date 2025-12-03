@@ -228,6 +228,7 @@
                 if (type === 'Data_Uraian') html = `<td>${row[0]||''}</td><td>${row[1]||''}</td>${btns}`;
                 else if (type === 'Data_Toko') html = `<td><b>${row[0]||'-'}</b><br><small class="text-muted">${row[1]||''}</small></td><td>${row[2]||'-'}<br><small class="text-muted">${row[3]||''}</small></td><td>${row[4]||'-'}</td>${btns}`;
                 else if (type === 'Data_Tukang') html = `<td>${row[0]||''}</td><td>${row[1]||''}</td>${btns}`;
+                else if (type === 'Data_Guru') html = `<td>${row[0]||''}</td><td>${row[1]||'-'}</td>${btns}`;
                 const tr = document.createElement('tr'); tr.innerHTML = html; tbody.appendChild(tr);
             });
         }).getAllMasterData(DB_ID, type);
@@ -245,6 +246,13 @@
         }
         else if (type === 'Data_Tukang') {
             data = [f.nama.value, f.alamat.value]; 
+        }
+        else if (type === 'Data_Guru') {
+             let nipVal = f.nip.value;
+             if (nipVal && String(nipVal).trim() !== "" && !nipVal.startsWith("'")) {
+                nipVal = "'" + nipVal; // Paksa format teks untuk NIP
+            }
+            data = [f.nama.value, nipVal];
         }
         // Di dalam fungsi simpanMaster(e, type) ...
         else if (type === 'Data_Toko') { 
@@ -297,6 +305,16 @@
             document.getElementById('k_nama').value = d[0]; 
             document.getElementById('k_alamat').value = d[1]; 
         } 
+        else if (type === 'Data_Guru') {
+            // Sembunyikan form bulk, munculkan form single
+            document.getElementById('mode_input_guru_bulk').classList.add('hidden');
+            document.getElementById('mode_input_guru_single').classList.remove('hidden');
+
+            document.getElementById('g_nama').value = d[0];
+            let nip = d[1] ? String(d[1]) : "";
+            if(nip.startsWith("'")) nip = nip.substring(1);
+            document.getElementById('g_nip').value = nip;
+        }
         // Di dalam fungsi editMaster(type, index) ...
         else if (type === 'Data_Toko') { 
             document.getElementById('t_nama').value = d[0]; 
@@ -358,6 +376,13 @@
             document.getElementById('k_nama').value = ""; 
             document.getElementById('k_alamat').value = ""; 
         } 
+        if (type === 'Data_Guru') {
+            document.getElementById('g_nama').value = "";
+            document.getElementById('g_nip').value = "";
+            // Kembalikan ke mode bulk
+            document.getElementById('mode_input_guru_bulk').classList.remove('hidden');
+            document.getElementById('mode_input_guru_single').classList.add('hidden');
+        }
         // Di dalam fungsi resetFormMaster(type) ...
         if (type === 'Data_Toko') { 
             // Reset field manual juga
@@ -382,7 +407,24 @@
     // ==========================================
 
     function loadDropdowns() { 
-        google.script.run.withSuccessHandler(res => { CACHE_DROPDOWNS = res; const u = document.getElementById('trxUraian'); u.innerHTML = '<option value="">Pilih Uraian...</option>'; res.uraian.forEach(x => u.add(new Option(x, x))); renderPihakOptions(); }).getDropdownData(DB_ID); 
+        google.script.run.withSuccessHandler(res => { 
+            CACHE_DROPDOWNS = res; 
+            
+            // Isi Dropdown Uraian
+            const u = document.getElementById('trxUraian'); 
+            u.innerHTML = '<option value="">Pilih Uraian...</option>'; 
+            res.uraian.forEach(x => u.add(new Option(x, x))); 
+            
+            // --- TAMBAHAN ISI DROPDOWN PEMESAN ---
+            const pm = document.getElementById('trxPemesan');
+            pm.innerHTML = '<option value="">Pilih Pemesan...</option>';
+            if (res.guru) {
+                res.guru.forEach(x => pm.add(new Option(x, x)));
+            }
+            // -------------------------------------
+
+            renderPihakOptions(); 
+        }).getDropdownData(DB_ID); 
     }
 
     function renderPihakOptions() { 
@@ -414,6 +456,7 @@
         // PERUBAHAN DI SINI: no_bukti diisi string kosong "" karena formnya sudah dihapus
         const h = { 
             tanggal: f.tanggal.value, 
+            pemesan: f.pemesan.value,
             toko: f.toko.value, 
             uraian: f.uraian.value, 
             no_bukti: "" 
@@ -455,7 +498,24 @@
             data.forEach((trx, index) => {
                 let itemStr = trx.items.map(i => `&bull; <b>${i.nama}</b> (${i.vol} ${i.sat} @ ${formatRupiah(i.harga)} = ${formatRupiah(i.total)})`).join('<span class="mx-3 text-muted">|</span>');
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td>${trx.tanggal}</td><td><div class="info-scroll">${trx.toko}</div></td><td><div class="info-scroll">${trx.uraian}</div></td><td><div class="detail-scroll">${itemStr}</div></td><td class="text-end fw-bold text-success">${formatRupiah(trx.total_trx)}</td><td class="col-aksi"><div class="btn-group btn-group-sm"><button class="btn btn-outline-warning" title="Edit" onclick="editTransaksi(${index})"><i class="fas fa-pen"></i></button><button class="btn btn-outline-danger" title="Hapus" onclick="deleteTransaksi('${trx.id}')"><i class="fas fa-trash-alt"></i></button></div></td>`;
+                
+                // Tambahkan ${trx.pemesan} di dalam kolom Toko atau kolom baru. 
+                // Disini saya gabung di kolom Toko/Pihak supaya tabel tidak terlalu lebar
+                tr.innerHTML = `
+                    <td>${trx.tanggal}</td>
+                    <td>
+                        <div class="fw-bold text-primary small mb-1"><i class="fas fa-user"></i> ${trx.pemesan || '-'}</div>
+                        <div class="info-scroll">${trx.toko}</div>
+                    </td>
+                    <td><div class="info-scroll">${trx.uraian}</div></td>
+                    <td><div class="detail-scroll">${itemStr}</div></td>
+                    <td class="text-end fw-bold text-success">${formatRupiah(trx.total_trx)}</td>
+                    <td class="col-aksi">
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-warning" title="Edit" onclick="editTransaksi(${index})"><i class="fas fa-pen"></i></button>
+                            <button class="btn btn-outline-danger" title="Hapus" onclick="deleteTransaksi('${trx.id}')"><i class="fas fa-trash-alt"></i></button>
+                        </div>
+                    </td>`;
                 tbody.appendChild(tr);
             });
         }).getRiwayatTransaksiGrouped(DB_ID);
@@ -507,6 +567,20 @@
 
             // Isi Tanggal
             document.getElementById('trxTanggal').value = trx.tanggal;
+
+            // --- TAMBAHAN ISI PEMESAN ---
+            const selectPemesan = document.getElementById('trxPemesan');
+            // Cek apakah data pemesan lama masih ada di master
+            let pemesanAda = false;
+            for(let i=0; i<selectPemesan.options.length; i++) {
+                if(selectPemesan.options[i].value === trx.pemesan) { pemesanAda = true; break; }
+            }
+            // Jika tidak ada di list master, tambahkan sementara agar tidak error/kosong
+            if(!pemesanAda && trx.pemesan) {
+                selectPemesan.add(new Option(trx.pemesan, trx.pemesan));
+            }
+            selectPemesan.value = trx.pemesan || "";
+            // ----------------------------
             
             // Isi Uraian (dengan pengaman jika data master uraian terhapus)
             const selectUraian = document.getElementById('trxUraian');
@@ -673,6 +747,75 @@
                 btnOtp.innerText = "Kirim OTP";
             }
         }).sendOtpRegistration(email);
+    }
+
+    // ==========================================
+    // LOGIKA KHUSUS BULK INSERT DATA GURU
+    // ==========================================
+
+    function initGuruInput() {
+        const tbody = document.getElementById('tbody_input_guru');
+        // Jika kosong, tambahkan 1 baris default
+        if (tbody.rows.length === 0) {
+            addGuruRow();
+        }
+    }
+
+    function addGuruRow() {
+        const tbody = document.getElementById('tbody_input_guru');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="p-1"><input type="text" class="form-control form-control-sm i-g-nama" placeholder="Nama..." required></td>
+            <td class="p-1"><input type="text" class="form-control form-control-sm i-g-nip" placeholder="NIP..."></td>
+            <td class="p-1 text-center"><button type="button" class="btn btn-danger btn-sm py-0 px-2" onclick="removeGuruRow(this)">x</button></td>
+        `;
+        tbody.appendChild(tr);
+    }
+
+    function removeGuruRow(btn) {
+        const row = btn.closest('tr');
+        row.remove();
+        // Pastikan minimal ada 1 baris agar user tidak bingung
+        if (document.getElementById('tbody_input_guru').rows.length === 0) {
+            addGuruRow();
+        }
+    }
+
+    function simpanGuruBulk(e) {
+        e.preventDefault();
+        
+        let dataToSave = [];
+        const rows = document.querySelectorAll('#tbody_input_guru tr');
+        
+        rows.forEach(r => {
+            const nama = r.querySelector('.i-g-nama').value;
+            let nip = r.querySelector('.i-g-nip').value;
+            
+            if (nama.trim() !== "") {
+                if (nip && nip.trim() !== "" && !nip.startsWith("'")) {
+                    nip = "'" + nip; // Format NIP
+                }
+                dataToSave.push([nama, nip]);
+            }
+        });
+
+        if (dataToSave.length === 0) {
+            return showAlert("Isi minimal satu nama guru!", "warning");
+        }
+
+        loader(true);
+        google.script.run.withSuccessHandler(res => {
+            loader(false);
+            showAlert(res, 'success');
+            
+            // Reset tabel input
+            document.getElementById('tbody_input_guru').innerHTML = '';
+            addGuruRow();
+            
+            // Refresh tabel data master
+            loadMasterTable('Data_Guru');
+            
+        }).saveBulkMasterData(DB_ID, 'Data_Guru', dataToSave);
     }
 
     // Init Empty Row
