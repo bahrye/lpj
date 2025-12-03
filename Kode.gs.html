@@ -26,6 +26,8 @@ function ensureSheetExists(ss, sheetName) {
       sheet.appendRow(["Kode Rekening", "Nama Uraian Belanja"]);
     } else if (sheetName === "Data_Tukang") {
       sheet.appendRow(["Nama Tukang", "Alamat Tukang"]);
+    } else if (sheetName === "Data_Guru") {
+      sheet.appendRow(["Nama Lengkap", "NIP"]);
     } else if (sheetName === "Data_Nomor_Surat") {
       sheet.appendRow(["ID_TRX", "No_Keluar", "No_Masuk", "No_Periksa", "No_Terima", "No_Bayar"]);
     } else if (sheetName === "Data_Tanggal_Surat") {
@@ -292,13 +294,17 @@ function getDropdownData(dbId) {
     const sToko = ensureSheetExists(ss, "Data_Toko");
     const sUraian = ensureSheetExists(ss, "Data_Uraian");
     const sTukang = ensureSheetExists(ss, "Data_Tukang");
+    // --- TAMBAHAN: LOAD DATA GURU ---
+    const sGuru = ensureSheetExists(ss, "Data_Guru"); 
 
     const dataToko = sToko.getLastRow() > 1 ? sToko.getRange(2, 1, sToko.getLastRow()-1, 1).getValues().flat() : [];
     const dataUraian = sUraian.getLastRow() > 1 ? sUraian.getRange(2, 2, sUraian.getLastRow()-1, 1).getValues().flat() : [];
     const dataTukang = sTukang.getLastRow() > 1 ? sTukang.getRange(2, 1, sTukang.getLastRow()-1, 1).getValues().flat() : [];
+    // --- AMBIL KOLOM NAMA GURU (Index 1) ---
+    const dataGuru = sGuru.getLastRow() > 1 ? sGuru.getRange(2, 1, sGuru.getLastRow()-1, 1).getValues().flat() : [];
 
-    return { toko: dataToko, uraian: dataUraian, tukang: dataTukang }; 
-  } catch (e) { return { toko: [], uraian: [], tukang: [] }; }
+    return { toko: dataToko, uraian: dataUraian, tukang: dataTukang, guru: dataGuru }; 
+  } catch (e) { return { toko: [], uraian: [], tukang: [], guru: [] }; }
 }
 
 // --- TRANSAKSI (LOGIKA UTAMA) ---
@@ -338,7 +344,8 @@ function processTransaksiLengkap(dbId, header, items, idEdit) {
       item.sat, 
       item.harga, 
       item.total, 
-      header.no_bukti
+      header.no_bukti,
+      header.pemesan
     ]);
   });
 
@@ -389,7 +396,8 @@ function getRiwayatTransaksiGrouped(dbId) {
     const lr = ss.getLastRow();
     if (lr <= 1) return [];
 
-    const data = ss.getRange(2, 1, lr - 1, 10).getValues(); 
+    // UBAH RANGE: Ambil sampai 11 kolom (sebelumnya 10)
+    const data = ss.getRange(2, 1, lr - 1, 11).getValues(); 
     let grouped = {};
     
     for(let i = data.length - 1; i >= 0; i--) {
@@ -407,6 +415,7 @@ function getRiwayatTransaksiGrouped(dbId) {
                 uraian: row[2],
                 toko: row[3],
                 no_bukti: row[9],
+                pemesan: row[10] || "", // <--- TAMBAHAN BACA DATA
                 items: [],
                 total_trx: 0
             };
@@ -748,6 +757,22 @@ function generatePDFLaporan(dbId, idTrx) {
   } catch (e) {
     return { status: 'error', message: e.toString() };
   }
+}
+
+// --- TAMBAHAN FUNGSI BARU UNTUK SAVE BANYAK ---
+function saveBulkMasterData(dbId, sheetName, data2D) {
+  try {
+    const ss = SpreadsheetApp.openById(dbId);
+    const sheet = ensureSheetExists(ss, sheetName);
+    
+    // Cek apakah data kosong
+    if (!data2D || data2D.length === 0) return "Tidak ada data yang disimpan.";
+    
+    // Simpan banyak baris sekaligus menggunakan setValues
+    sheet.getRange(sheet.getLastRow() + 1, 1, data2D.length, data2D[0].length).setValues(data2D);
+    
+    return "Berhasil menambahkan " + data2D.length + " data Guru!";
+  } catch (e) { return "Error: " + e.toString(); }
 }
 
 function cekIzinEmail() {
