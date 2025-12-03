@@ -1,0 +1,149 @@
+/**
+ * KONFIGURASI UTAMA
+ * Masukkan ID Spreadsheet yang sudah Anda buat
+ */
+const ID_DB_MASTER = "1e1V7DQjOWRnx9KETszXwYYDCKAMeUfI3z9In9fM1fxM";
+const ID_TEMPLATE = "126RPw6wPoUmPgYt16jyzd1EY-ma5xGFr8WoRSQoShUw";
+
+// --- ROUTING ---
+function doGet(e) {
+  return HtmlService.createTemplateFromFile('index')
+    .evaluate()
+    .setTitle('Sistem LPJ BOS Terpadu')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+// --- AUTHENTICATION (LOGIN & REGISTER) ---
+function registerUser(form) {
+  const ssMaster = SpreadsheetApp.openById(ID_DB_MASTER).getSheetByName("Users");
+  const data = ssMaster.getDataRange().getValues();
+  
+  // Cek duplikasi email
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][2] == form.email) {
+      return { status: "error", message: "Email sudah terdaftar!" };
+    }
+  }
+
+  try {
+    // Copy Template untuk Sekolah Baru
+    const templateFile = DriveApp.getFileById(ID_TEMPLATE);
+    const newFile = templateFile.makeCopy("DB BOS - " + form.sekolah);
+    newFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.EDITOR); // Opsional
+    const newId = newFile.getId();
+
+    // Simpan User Baru ke Master
+    ssMaster.appendRow([
+      new Date(),
+      form.sekolah,
+      form.email,
+      form.password, 
+      newId
+    ]);
+
+    return { status: "success", message: "Registrasi Berhasil! Silakan Login." };
+  } catch (e) {
+    return { status: "error", message: "Gagal membuat database: " + e.toString() };
+  }
+}
+
+function loginUser(form) {
+  const ssMaster = SpreadsheetApp.openById(ID_DB_MASTER).getSheetByName("Users");
+  const data = ssMaster.getDataRange().getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][2] == form.email && data[i][3] == form.password) {
+      return { 
+        status: "success", 
+        token: data[i][4], // ID Spreadsheet Sekolah
+        sekolah: data[i][1]
+      }; 
+    }
+  }
+  return { status: "error", message: "Email atau Password salah!" };
+}
+
+// --- DATA SEKOLAH ---
+function getDataSekolah(dbId) {
+  try {
+    const ss = SpreadsheetApp.openById(dbId).getSheetByName("Data_Sekolah");
+    const data = ss.getDataRange().getValues();
+    let result = {};
+    data.forEach(row => { if(row[0]) result[row[0]] = row[1]; });
+    return result;
+  } catch(e) { return {}; }
+}
+
+function saveDataSekolah(dbId, formObj) {
+  const ss = SpreadsheetApp.openById(dbId).getSheetByName("Data_Sekolah");
+  ss.clear(); 
+  const entries = Object.entries(formObj);
+  if(entries.length > 0) {
+    ss.getRange(1, 1, entries.length, 2).setValues(entries);
+  }
+  return "Data Sekolah Berhasil Disimpan!";
+}
+
+// --- MASTER DATA (TOKO & URAIAN) ---
+// Fungsi Generic untuk simpan data master
+function saveMasterData(dbId, sheetName, dataArray) {
+  const ss = SpreadsheetApp.openById(dbId).getSheetByName(sheetName);
+  ss.appendRow(dataArray);
+  return "Data Berhasil Ditambahkan";
+}
+
+function getDropdownData(dbId) {
+  const ss = SpreadsheetApp.openById(dbId);
+  
+  // Ambil Data Toko (Kolom A: Nama)
+  const sToko = ss.getSheetByName("Data_Toko");
+  const dataToko = sToko.getLastRow() > 1 ? sToko.getRange(2, 1, sToko.getLastRow()-1, 1).getValues().flat() : [];
+
+  // Ambil Data Uraian (Kolom B: Nama)
+  const sUraian = ss.getSheetByName("Data_Uraian");
+  const dataUraian = sUraian.getLastRow() > 1 ? sUraian.getRange(2, 2, sUraian.getLastRow()-1, 1).getValues().flat() : [];
+
+  return { toko: dataToko, uraian: dataUraian };
+}
+
+// --- TRANSAKSI ---
+function processTransaksiLengkap(dbId, header, items) {
+  const ss = SpreadsheetApp.openById(dbId).getSheetByName("Transaksi");
+  const idTrx = "TRX-" + new Date().getTime(); 
+  
+  let rowsToSave = [];
+  items.forEach(item => {
+    rowsToSave.push([
+      idTrx,
+      header.tanggal,
+      header.uraian,
+      header.toko,
+      item.nama,
+      item.vol,
+      item.sat,
+      item.harga,
+      item.total,
+      header.no_bukti
+    ]);
+  });
+
+  if (rowsToSave.length > 0) {
+    ss.getRange(ss.getLastRow() + 1, 1, rowsToSave.length, rowsToSave[0].length).setValues(rowsToSave);
+  }
+    
+  return "Transaksi Berhasil Disimpan!";
+}
+
+// --- DASHBOARD STATS ---
+function getDashboardStats(dbId) {
+  const ss = SpreadsheetApp.openById(dbId).getSheetByName("Transaksi");
+  const lr = ss.getLastRow();
+  if (lr <= 1) return { total: 0, count: 0 };
+  
+  const values = ss.getRange(2, 9, lr-1, 1).getValues(); // Ambil kolom Total (I)
+  let totalBelanja = 0;
+  values.forEach(v => totalBelanja += Number(v[0] || 0));
+  
+  return { total: totalBelanja, count: lr-1 };
+}
