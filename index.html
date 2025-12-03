@@ -63,16 +63,36 @@
         <div id="view-dashboard" class="app-view">
           <h3>Ringkasan Keuangan</h3>
           <div class="row mt-4">
-            <div class="col-md-4">
-              <div class="card text-white bg-success mb-3 shadow">
-                <div class="card-header">Total Belanja</div>
-                <div class="card-body"><h2 class="card-title" id="dashTotal">Rp 0</h2></div>
+            <div class="col-md-3">
+              <div class="card text-white bg-primary mb-3 shadow">
+                <div class="card-header">Total Anggaran</div>
+                <div class="card-body">
+                  <h4 class="card-title" id="dashAnggaran">Rp. 0</h4>
+                </div>
               </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
+              <div class="card text-white bg-warning mb-3 shadow">
+                <div class="card-header">Total Belanja</div>
+                <div class="card-body">
+                  <h4 class="card-title" id="dashBelanja">Rp. 0</h4>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="card text-white bg-success mb-3 shadow" id="cardSisa">
+                <div class="card-header">Sisa Anggaran</div>
+                <div class="card-body">
+                  <h4 class="card-title" id="dashSisa">Rp. 0</h4>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-3">
               <div class="card text-white bg-info mb-3 shadow">
                 <div class="card-header">Jumlah Transaksi</div>
-                <div class="card-body"><h2 class="card-title" id="dashCount">0</h2></div>
+                <div class="card-body">
+                  <h4 class="card-title" id="dashCount">0</h4>
+                </div>
               </div>
             </div>
           </div>
@@ -84,6 +104,15 @@
             <div class="card-body">
               <form id="formSekolah" onsubmit="simpanSekolah(event)">
                 <div class="row">
+                  <div class="col-12 mb-3">
+                    <label class="fw-bold">Total Anggaran (1 Tahun)</label>
+                    <div class="input-group">
+                      <span class="input-group-text">Rp</span>
+                      <input type="number" name="total_anggaran" class="form-control" placeholder="Contoh: 50000000">
+                    </div>
+                    <small class="text-muted">Masukkan angka saja tanpa titik/koma.</small>
+                  </div>
+                  <hr>
                   <div class="col-md-6 mb-3"><label>Nama Kepala Sekolah</label><input type="text" name="kepsek" class="form-control"></div>
                   <div class="col-md-6 mb-3"><label>NIP Kepala Sekolah</label><input type="text" name="nip_kepsek" class="form-control"></div>
                   <div class="col-md-6 mb-3"><label>Nama Bendahara</label><input type="text" name="bendahara" class="form-control"></div>
