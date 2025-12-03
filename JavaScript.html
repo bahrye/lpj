@@ -5,19 +5,18 @@
     let DB_ID = localStorage.getItem('bos_db_id');
     let SEKOLAH_NAMA = localStorage.getItem('bos_sekolah_nama');
     
-    // UPDATE: Cache tambahan untuk Dropdown agar mudah switch tab
     let CACHE_DROPDOWNS = { toko: [], uraian: [], tukang: [] };
-    let TRX_MODE = 'belanja'; // Default: Belanja
+    let TRX_MODE = 'belanja'; 
 
-    // Cache sederhana untuk menyimpan data sementara agar tidak bolak-balik request
     let CACHE_DATA = { 
         Data_Uraian: [], 
         Data_Toko: [], 
         Data_Tukang: [], 
         Riwayat: [] 
     };
+    
+    let CACHE_NOMOR_SURAT = {}; // Cache baru untuk nomor surat
 
-    // Cek Login saat halaman dimuat
     if (DB_ID) { 
         initDashboard(); 
     } else { 
@@ -25,24 +24,21 @@
     }
 
     // ==========================================
-    // 2. UTILITY FUNCTIONS (Fungsi Bantuan)
+    // 2. UTILITY FUNCTIONS
     // ==========================================
     
-    // Tampilkan/Sembunyikan Loader
     function loader(show) { 
         document.getElementById('loader').style.display = show ? 'flex' : 'none'; 
     }
 
-    // Format Format Rupiah (Rp. 100.000)
     function formatRupiah(angka) {
         return new Intl.NumberFormat('id-ID', {
             style: 'currency',
             currency: 'IDR',
             minimumFractionDigits: 0
-        }).format(angka).replace("Rp", "Rp."); // Menambah titik setelah Rp
+        }).format(angka).replace("Rp", "Rp."); 
     }
 
-    // Toggle Sidebar Menu
     function toggleSidebar() {
         document.getElementById('wrapper').classList.toggle('toggled');
         const sidebar = document.getElementById('sidebar-wrapper');
@@ -50,7 +46,7 @@
     }
 
     // ==========================================
-    // 3. AUTHENTICATION (Login/Register/Logout)
+    // 3. AUTHENTICATION
     // ==========================================
     
     function switchAuth(type) {
@@ -112,25 +108,22 @@
     // ==========================================
     
     function openView(viewName) {
-        // Sembunyikan semua view
         document.querySelectorAll('.app-view').forEach(el => el.classList.add('hidden'));
-        
-        // Tampilkan view yang dipilih
         document.getElementById('view-' + viewName).classList.remove('hidden');
 
-        // Load data spesifik sesuai halaman yang dibuka
         if (viewName === 'sekolah') loadSekolahData();
         if (viewName === 'dashboard') loadStats();
         if (viewName === 'transaksi') { 
             loadDropdowns(); 
             loadRiwayat(); 
         }
-        // TAMBAHAN BARU
+        if (viewName === 'master') loadMasterTable('Data_Uraian');
+        
+        // VIEW BARU
         if (viewName === 'pengaturan') {
             loadExistingKop();
             // Default tab
         }
-        if (viewName === 'master') loadMasterTable('Data_Uraian');
     }
 
     // ==========================================
@@ -139,20 +132,16 @@
     
     function loadStats() { 
         google.script.run.withSuccessHandler(res => { 
-            // Update Angka di Kartu
             document.getElementById('dashAnggaran').innerText = formatRupiah(res.anggaran);
             document.getElementById('dashBelanja').innerText = formatRupiah(res.belanja);
             document.getElementById('dashSisa').innerText = formatRupiah(res.sisa);
             document.getElementById('dashCount').innerText = res.count; 
             
-            // Logic Warna Sisa Anggaran (Merah jika minus)
             const cardSisa = document.getElementById('cardSisa');
             if (res.sisa < 0) {
-                cardSisa.classList.remove('bg-success');
-                cardSisa.classList.add('bg-danger'); 
+                cardSisa.classList.replace('bg-success', 'bg-danger'); 
             } else {
-                cardSisa.classList.remove('bg-danger');
-                cardSisa.classList.add('bg-success');
+                cardSisa.classList.replace('bg-danger', 'bg-success');
             }
         }).getDashboardStats(DB_ID); 
     }
@@ -174,7 +163,6 @@
         e.preventDefault(); 
         loader(true); 
         const formData = Object.fromEntries(new FormData(e.target));
-        
         google.script.run.withSuccessHandler(res => { 
             loader(false); 
             alert(res); 
@@ -200,21 +188,11 @@
             
             data.forEach((row, index) => {
                 let html = '';
-                const btns = `
-                    <td>
-                        <button class="btn btn-warning btn-sm py-0 px-1" onclick="editMaster('${type}', ${index})"><i class="fas fa-edit"></i></button> 
-                        <button class="btn btn-danger btn-sm py-0 px-1" onclick="deleteMaster('${type}', ${index})"><i class="fas fa-trash"></i></button>
-                    </td>`;
+                const btns = `<td><button class="btn btn-warning btn-sm py-0 px-1" onclick="editMaster('${type}', ${index})"><i class="fas fa-edit"></i></button> <button class="btn btn-danger btn-sm py-0 px-1" onclick="deleteMaster('${type}', ${index})"><i class="fas fa-trash"></i></button></td>`;
                 
-                if (type === 'Data_Uraian') {
-                    html = `<td>${row[0]||''}</td><td>${row[1]||''}</td>${btns}`;
-                } else if (type === 'Data_Toko') {
-                    html = `<td><b>${row[0]||'-'}</b><br><small class="text-muted">${row[1]||''}</small></td>
-                            <td>${row[2]||'-'}<br><small class="text-muted">${row[3]||''}</small></td>
-                            <td>${row[4]||'-'}</td>${btns}`;
-                } else if (type === 'Data_Tukang') {
-                    html = `<td>${row[0]||''}</td><td>${row[1]||''}</td>${btns}`;
-                }
+                if (type === 'Data_Uraian') html = `<td>${row[0]||''}</td><td>${row[1]||''}</td>${btns}`;
+                else if (type === 'Data_Toko') html = `<td><b>${row[0]||'-'}</b><br><small class="text-muted">${row[1]||''}</small></td><td>${row[2]||'-'}<br><small class="text-muted">${row[3]||''}</small></td><td>${row[4]||'-'}</td>${btns}`;
+                else if (type === 'Data_Tukang') html = `<td>${row[0]||''}</td><td>${row[1]||''}</td>${btns}`;
                 
                 const tr = document.createElement('tr'); 
                 tr.innerHTML = html; 
@@ -234,9 +212,7 @@
         if (type === 'Data_Tukang') data = [f.nama.value, f.alamat.value]; 
         if (type === 'Data_Toko') { 
             let tgl = ""; 
-            if (f.tgl_ttd.value) {
-                try { tgl = new Date(f.tgl_ttd.value).toISOString().slice(0,10); } catch(er){}
-            } 
+            if (f.tgl_ttd.value) { try { tgl = new Date(f.tgl_ttd.value).toISOString().slice(0,10); } catch(er){} } 
             data = [f.nama.value, f.jenis.value, f.alamat.value, f.telp.value, f.pemilik.value, tgl]; 
         } 
         
@@ -281,68 +257,43 @@
         document.getElementById('btn_'+type).classList.replace('btn-warning','btn-primary'); 
         document.getElementById('cancel_'+type).classList.add('hidden'); 
         
-        if (type === 'Data_Uraian') {
-            document.getElementById('u_kode').value = "";
-            document.getElementById('u_nama').value = "";
-        } 
-        if (type === 'Data_Tukang') {
-            document.getElementById('k_nama').value = "";
-            document.getElementById('k_alamat').value = "";
-        } 
-        if (type === 'Data_Toko') {
-            ['t_nama','t_jenis','t_alamat','t_telp','t_pemilik','t_tgl_ttd'].forEach(id => document.getElementById(id).value = "");
-        } 
+        if (type === 'Data_Uraian') { document.getElementById('u_kode').value = ""; document.getElementById('u_nama').value = ""; } 
+        if (type === 'Data_Tukang') { document.getElementById('k_nama').value = ""; document.getElementById('k_alamat').value = ""; } 
+        if (type === 'Data_Toko') { ['t_nama','t_jenis','t_alamat','t_telp','t_pemilik','t_tgl_ttd'].forEach(id => document.getElementById(id).value = ""); } 
     }
 
     function deleteMaster(type, index) { 
         if (!confirm("Hapus data ini?")) return; 
         loader(true); 
-        google.script.run.withSuccessHandler(r => {
-            loader(false);
-            loadMasterTable(type);
-        }).deleteMasterData(DB_ID, type, index); 
+        google.script.run.withSuccessHandler(r => { loader(false); loadMasterTable(type); }).deleteMasterData(DB_ID, type, index); 
     }
 
     // ==========================================
-    // 8. TRANSAKSI LOGIC (Input & Kalkulasi)
+    // 8. TRANSAKSI LOGIC
     // ==========================================
 
-    // UPDATE: Fungsi Load Dropdowns diperbarui untuk support switching
     function loadDropdowns() { 
         google.script.run.withSuccessHandler(res => { 
-            CACHE_DROPDOWNS = res; // Simpan ke global variable
-            
-            // Render Uraian
+            CACHE_DROPDOWNS = res; 
             const u = document.getElementById('trxUraian'); 
             u.innerHTML = '<option value="">Pilih Uraian...</option>'; 
             res.uraian.forEach(x => u.add(new Option(x, x))); 
-            
-            // Render Pihak (Toko/Tukang) sesuai mode
             renderPihakOptions();
-
         }).getDropdownData(DB_ID); 
     }
 
-    // UPDATE: Fungsi Baru Render Pilihan (Toko/Tukang)
     function renderPihakOptions() {
         const p = document.getElementById('trxPihak');
         p.innerHTML = '<option value="">Pilih...</option>';
-        
         let listData = (TRX_MODE === 'belanja') ? CACHE_DROPDOWNS.toko : CACHE_DROPDOWNS.tukang;
-        if (listData && listData.length > 0) {
-            listData.forEach(x => p.add(new Option(x, x)));
-        }
+        if (listData && listData.length > 0) listData.forEach(x => p.add(new Option(x, x)));
     }
 
-    // UPDATE: Fungsi Switch Mode Tab
     function switchTrxMode(mode) {
         TRX_MODE = mode;
-        
-        // Update Class Active Tab
         document.getElementById('tabBelanja').classList.toggle('active', mode === 'belanja');
         document.getElementById('tabTukang').classList.toggle('active', mode === 'tukang');
         
-        // Update Teks Judul & Label
         if (mode === 'belanja') {
             document.getElementById('titleTrx').innerText = "Input Transaksi Belanja";
             document.getElementById('lblPihak').innerText = "Toko";
@@ -350,68 +301,39 @@
             document.getElementById('titleTrx').innerText = "Input Transaksi Tukang";
             document.getElementById('lblPihak').innerText = "Tukang";
         }
-        
-        // Render Ulang Dropdown
         renderPihakOptions();
     }
 
     function addRow() { 
         const tr = document.createElement('tr'); 
-        tr.innerHTML = `
-            <td><input class="form-control form-control-sm i-nama"></td>
-            <td><input type="number" class="form-control form-control-sm i-vol" oninput="cR(this)"></td>
-            <td><input class="form-control form-control-sm i-sat"></td>
-            <td><input type="number" class="form-control form-control-sm i-harga" oninput="cR(this)"></td>
-            <td><input type="text" class="form-control form-control-sm i-total" readonly value="Rp. 0" data-value="0"></td>
-            <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove();cGT()">x</button></td>
-        `; 
+        tr.innerHTML = `<td><input class="form-control form-control-sm i-nama"></td><td><input type="number" class="form-control form-control-sm i-vol" oninput="cR(this)"></td><td><input class="form-control form-control-sm i-sat"></td><td><input type="number" class="form-control form-control-sm i-harga" oninput="cR(this)"></td><td><input type="text" class="form-control form-control-sm i-total" readonly value="Rp. 0" data-value="0"></td><td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove();cGT()">x</button></td>`; 
         document.getElementById('trxBody').appendChild(tr); 
     }
 
-    // Calculate Row (Hitung per baris)
     function cR(e) { 
         const r = e.closest('tr'); 
         const v = r.querySelector('.i-vol').value || 0; 
         const h = r.querySelector('.i-harga').value || 0; 
         const total = v * h;
-        
-        const elTotal = r.querySelector('.i-total');
-        elTotal.value = formatRupiah(total);       // Tampilan (Rp. xxx)
-        elTotal.setAttribute('data-value', total); // Data Asli (angka)
-        
+        r.querySelector('.i-total').value = formatRupiah(total);       
+        r.querySelector('.i-total').setAttribute('data-value', total); 
         cGT(); 
     }
 
-    // Calculate Grand Total (Hitung Total Semua)
     function cGT() { 
         let t = 0; 
-        document.querySelectorAll('.i-total').forEach(e => {
-            // Ambil dari data-value bukan value karena value isinya string Rp
-            t += Number(e.getAttribute('data-value') || 0);
-        }); 
+        document.querySelectorAll('.i-total').forEach(e => { t += Number(e.getAttribute('data-value') || 0); }); 
         document.getElementById('grandTotal').innerText = formatRupiah(t); 
     }
     
     function simpanTransaksi(e) { 
         e.preventDefault(); 
         const f = e.target;
-        const h = {
-            tanggal: f.tanggal.value, 
-            toko: f.toko.value, 
-            uraian: f.uraian.value, 
-            no_bukti: f.no_bukti.value
-        };
+        const h = { tanggal: f.tanggal.value, toko: f.toko.value, uraian: f.uraian.value, no_bukti: f.no_bukti.value };
         const it = []; 
         
         document.querySelectorAll('#trxBody tr').forEach(r => { 
-            const rawTotal = r.querySelector('.i-total').getAttribute('data-value') || 0;
-            it.push({
-                nama: r.querySelector('.i-nama').value, 
-                vol: r.querySelector('.i-vol').value, 
-                sat: r.querySelector('.i-sat').value, 
-                harga: r.querySelector('.i-harga').value, 
-                total: rawTotal // Kirim angka murni ke server
-            });
+            it.push({ nama: r.querySelector('.i-nama').value, vol: r.querySelector('.i-vol').value, sat: r.querySelector('.i-sat').value, harga: r.querySelector('.i-harga').value, total: r.querySelector('.i-total').getAttribute('data-value') || 0 });
         }); 
         
         if (it.length === 0) return alert("Belum ada barang yang diinput!"); 
@@ -424,17 +346,14 @@
             document.getElementById('trxBody').innerHTML = ''; 
             document.getElementById('grandTotal').innerText = "Rp. 0";
             addRow();
-            
-            // Kembalikan ke Mode Default
             switchTrxMode('belanja');
-            
             loadRiwayat();
             loadStats(); 
         }).processTransaksiLengkap(DB_ID, h, it); 
     }
 
     // ==========================================
-    // 9. RIWAYAT & EDIT DATA
+    // 9. RIWAYAT LOGIC
     // ==========================================
 
     function loadRiwayat() {
@@ -445,41 +364,12 @@
             CACHE_DATA.Riwayat = data; 
             tbody.innerHTML = '';
             
-            if (!data || data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Belum ada data transaksi.</td></tr>';
-                return;
-            }
+            if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Belum ada data transaksi.</td></tr>'; return; }
             
             data.forEach((trx, index) => {
-                // Format item barang agar ada Rp. nya
-                let itemStr = trx.items.map(i => {
-                    const hargaFmt = formatRupiah(i.harga);
-                    const totalFmt = formatRupiah(i.total);
-                    return `&bull; <b>${i.nama}</b> (${i.vol} ${i.sat} @ ${hargaFmt} = ${totalFmt})`;
-                }).join('<span class="mx-3 text-muted">|</span>');
-                
+                let itemStr = trx.items.map(i => `&bull; <b>${i.nama}</b> (${i.vol} ${i.sat} @ ${formatRupiah(i.harga)} = ${formatRupiah(i.total)})`).join('<span class="mx-3 text-muted">|</span>');
                 const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td width="100">${trx.tanggal}</td>
-                    <td>
-                        <div class="info-scroll">${trx.toko}</div>
-                    </td>
-                    <td>
-                        <div class="info-scroll">${trx.uraian}</div>
-                    </td>
-                    <td>
-                        <div class="detail-scroll">
-                            ${itemStr}
-                        </div>
-                    </td>
-                    <td class="text-end fw-bold text-success">${formatRupiah(trx.total_trx)}</td>
-                    <td class="col-aksi">
-                        <div class="btn-group btn-group-sm">
-                            <button class="btn btn-outline-warning" title="Edit" onclick="editTransaksi(${index})"><i class="fas fa-pen"></i></button>
-                            <button class="btn btn-outline-danger" title="Hapus" onclick="deleteTransaksi('${trx.id}')"><i class="fas fa-trash-alt"></i></button>
-                        </div>
-                    </td>
-                `;
+                tr.innerHTML = `<td>${trx.tanggal}</td><td><div class="info-scroll">${trx.toko}</div></td><td><div class="info-scroll">${trx.uraian}</div></td><td><div class="detail-scroll">${itemStr}</div></td><td class="text-end fw-bold text-success">${formatRupiah(trx.total_trx)}</td><td class="col-aksi"><div class="btn-group btn-group-sm"><button class="btn btn-outline-warning" title="Edit" onclick="editTransaksi(${index})"><i class="fas fa-pen"></i></button><button class="btn btn-outline-danger" title="Hapus" onclick="deleteTransaksi('${trx.id}')"><i class="fas fa-trash-alt"></i></button></div></td>`;
                 tbody.appendChild(tr);
             });
         }).getRiwayatTransaksiGrouped(DB_ID);
@@ -488,71 +378,40 @@
     function deleteTransaksi(idTrx) {
         if (!confirm("Yakin ingin menghapus transaksi ini?")) return;
         loader(true);
-        google.script.run.withSuccessHandler(res => {
-            loader(false);
-            loadRiwayat();
-            loadStats(); // Update dashboard juga
-        }).deleteTransaksiById(DB_ID, idTrx);
+        google.script.run.withSuccessHandler(res => { loader(false); loadRiwayat(); loadStats(); }).deleteTransaksiById(DB_ID, idTrx);
     }
 
     function editTransaksi(index) {
-        if (!confirm("Edit Transaksi? Data akan dimuat ke form dan dihapus dari tabel riwayat sementara.")) return;
+        if (!confirm("Edit Transaksi?")) return;
         
         const trx = CACHE_DATA.Riwayat[index];
         if (!trx) return;
 
-        // UPDATE LOGIC: Cek apakah nama Toko/Pihak ada di data tukang
-        // Jika iya, switch ke mode Tukang, jika tidak default ke Toko
-        if (CACHE_DROPDOWNS.tukang && CACHE_DROPDOWNS.tukang.includes(trx.toko)) {
-            switchTrxMode('tukang');
-        } else {
-            switchTrxMode('belanja');
-        }
+        if (CACHE_DROPDOWNS.tukang && CACHE_DROPDOWNS.tukang.includes(trx.toko)) switchTrxMode('tukang'); else switchTrxMode('belanja');
 
-        // Isi Form Header
         document.getElementById('trxTanggal').value = trx.tanggal;
-        document.getElementById('trxPihak').value = trx.toko; // ID Updated
+        document.getElementById('trxPihak').value = trx.toko; 
         document.getElementById('trxUraian').value = trx.uraian;
         document.getElementById('trxBukti').value = trx.no_bukti;
 
-        // Isi Tabel Item Barang
         const tbody = document.getElementById('trxBody');
         tbody.innerHTML = ''; 
-        
         trx.items.forEach(item => {
             const tr = document.createElement('tr'); 
-            const totalFmt = formatRupiah(item.total);
-            tr.innerHTML = `
-                <td><input class="form-control form-control-sm i-nama" value="${item.nama}"></td>
-                <td><input type="number" class="form-control form-control-sm i-vol" value="${item.vol}" oninput="cR(this)"></td>
-                <td><input class="form-control form-control-sm i-sat" value="${item.sat}"></td>
-                <td><input type="number" class="form-control form-control-sm i-harga" value="${item.harga}" oninput="cR(this)"></td>
-                <td><input type="text" class="form-control form-control-sm i-total" readonly value="${totalFmt}" data-value="${item.total}"></td>
-                <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove();cGT()">x</button></td>
-            `; 
+            tr.innerHTML = `<td><input class="form-control form-control-sm i-nama" value="${item.nama}"></td><td><input type="number" class="form-control form-control-sm i-vol" value="${item.vol}" oninput="cR(this)"></td><td><input class="form-control form-control-sm i-sat" value="${item.sat}"></td><td><input type="number" class="form-control form-control-sm i-harga" value="${item.harga}" oninput="cR(this)"></td><td><input type="text" class="form-control form-control-sm i-total" readonly value="${formatRupiah(item.total)}" data-value="${item.total}"></td><td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove();cGT()">x</button></td>`; 
             tbody.appendChild(tr);
         });
         
-        cGT(); // Hitung ulang Grand Total
+        cGT(); 
         loader(true);
-        
-        // Hapus data lama di server karena akan disimpan ulang sebagai transaksi baru (edit flow)
-        google.script.run.withSuccessHandler(() => {
-            loader(false);
-            loadRiwayat(); 
-            // Scroll ke form input
-            document.getElementById('view-transaksi').scrollIntoView({behavior: 'smooth'});
-        }).deleteTransaksiById(DB_ID, trx.id);
+        google.script.run.withSuccessHandler(() => { loader(false); loadRiwayat(); document.getElementById('view-transaksi').scrollIntoView({behavior: 'smooth'}); }).deleteTransaksiById(DB_ID, trx.id);
     }
-    
-    // Tambah baris kosong saat pertama kali load
-    addRow();
 
     // ==========================================
-    // 10. LOGIC PENGATURAN CETAK
+    // 10. LOGIC PENGATURAN CETAK (BARU)
     // ==========================================
 
-    // --- A. KOP SURAT (UPDATED) ---
+    // --- A. KOP SURAT ---
     function previewKop(input) {
         if (input.files && input.files[0]) {
             var reader = new FileReader();
@@ -574,30 +433,23 @@
         const reader = new FileReader();
         
         reader.onload = function(e) {
-            const content = e.target.result.split(',')[1]; // Ambil base64-nya saja
-            
-            // PERBAIKAN: Parameter pertama sekarang adalah DB_ID
+            const content = e.target.result.split(',')[1]; 
             google.script.run.withSuccessHandler(res => {
                 loader(false);
-                if(res.status === 'success') {
-                    alert("Kop Surat berhasil disimpan ke Database!");
-                } else {
-                    alert("Gagal: " + res.message);
-                }
+                if(res.status === 'success') alert("Kop Surat berhasil disimpan ke Database!");
+                else alert("Gagal: " + res.message);
             }).saveKopSuratToDrive(DB_ID, content, file.type, SEKOLAH_NAMA);
         };
         reader.readAsDataURL(file);
     }
 
     function loadExistingKop() {
-        // PERBAIKAN: Kirim DB_ID untuk lookup ke Data_Sekolah
         google.script.run.withSuccessHandler(url => {
             if(url) {
                 document.getElementById('previewImgKop').src = url;
                 document.getElementById('previewImgKop').style.display = 'block';
                 document.getElementById('noKopText').style.display = 'none';
             } else {
-                // Jika tidak ada data
                 document.getElementById('previewImgKop').style.display = 'none';
                 document.getElementById('noKopText').style.display = 'block';
             }
@@ -605,18 +457,13 @@
     }
 
     // --- B. NOMOR SURAT ---
-    
-    let CACHE_NOMOR_SURAT = {};
-
     function loadPengaturanNomor() {
         const tbody = document.getElementById('tbody_setting_nomor');
         tbody.innerHTML = '<tr><td colspan="5" class="text-center">Memuat data transaksi...</td></tr>';
         
-        // 1. Ambil Transaksi
         google.script.run.withSuccessHandler(trxData => {
-            // 2. Ambil Data Nomor yang sudah tersimpan
             google.script.run.withSuccessHandler(nomorData => {
-                CACHE_NOMOR_SURAT = nomorData; // Simpan di cache {trxId: {keluar:..., masuk:...}}
+                CACHE_NOMOR_SURAT = nomorData; 
                 renderTableNomor(trxData, nomorData);
             }).getNomorSuratData(DB_ID);
         }).getRiwayatTransaksiGrouped(DB_ID);
@@ -626,65 +473,40 @@
         const tbody = document.getElementById('tbody_setting_nomor');
         tbody.innerHTML = '';
         
-        if (!trxList || trxList.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center">Belum ada transaksi. Input transaksi dulu.</td></tr>';
-            return;
-        }
+        if (!trxList || trxList.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center">Belum ada transaksi. Input transaksi dulu.</td></tr>'; return; }
 
         trxList.forEach(trx => {
             const id = trx.id;
             const saved = nomorMap[id];
             
-            // Cek status kelengkapan
             let statusBadge = '<span class="badge bg-danger">Belum Diisi</span>';
-            if (saved && saved.keluar && saved.bayar) { // Logika sederhana: jika ada no keluar & bayar dianggap "Terisi"
-                statusBadge = '<span class="badge bg-success">Sudah Diisi</span>';
-            }
+            if (saved && saved.keluar && saved.bayar) statusBadge = '<span class="badge bg-success">Sudah Diisi</span>';
 
             const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${trx.tanggal}</td>
-                <td>${trx.toko}</td>
-                <td>${trx.uraian}</td>
-                <td class="text-center">${statusBadge}</td>
-                <td class="text-center">
-                    <button class="btn btn-primary btn-sm" onclick="openModalNomor('${id}', '${trx.toko}')">
-                        <i class="fas fa-list-ol"></i> Input No
-                    </button>
-                </td>
-            `;
+            tr.innerHTML = `<td>${trx.tanggal}</td><td>${trx.toko}</td><td>${trx.uraian}</td><td class="text-center">${statusBadge}</td><td class="text-center"><button class="btn btn-primary btn-sm" onclick="openModalNomor('${id}', '${trx.toko}')"><i class="fas fa-list-ol"></i> Input No</button></td>`;
             tbody.appendChild(tr);
         });
     }
 
     function openModalNomor(trxId, pihakName) {
-        // Reset Form
         document.getElementById('formNomorSurat').reset();
         document.getElementById('ns_id_trx').value = trxId;
         
-        // Cek apakah Pihak adalah Tukang
-        // Kita gunakan list Tukang dari cache dropdown
         let isTukang = false;
-        if (CACHE_DROPDOWNS.tukang && CACHE_DROPDOWNS.tukang.includes(pihakName)) {
-            isTukang = true;
-        }
+        if (CACHE_DROPDOWNS.tukang && CACHE_DROPDOWNS.tukang.includes(pihakName)) isTukang = true;
         
-        // Atur UI berdasarkan Toko vs Tukang
         document.getElementById('ns_jenis_pihak').value = isTukang ? 'tukang' : 'toko';
         
         if (isTukang) {
-            // Jika Tukang: Sembunyikan No Surat Masuk, Ubah Label
             document.getElementById('div_ns_masuk').classList.add('hidden');
-            document.getElementById('lbl_ns_periksa').innerText = "Pekerjaan"; // BA Pemeriksaan Pekerjaan
-            document.getElementById('lbl_ns_terima').innerText = "Pekerjaan";  // BA Serah Terima Pekerjaan
+            document.getElementById('lbl_ns_periksa').innerText = "Pekerjaan"; 
+            document.getElementById('lbl_ns_terima').innerText = "Pekerjaan";  
         } else {
-            // Jika Toko: Tampilkan No Surat Masuk, Ubah Label
             document.getElementById('div_ns_masuk').classList.remove('hidden');
             document.getElementById('lbl_ns_periksa').innerText = "Barang";
             document.getElementById('lbl_ns_terima').innerText = "Barang";
         }
 
-        // Isi data jika sudah ada
         const saved = CACHE_NOMOR_SURAT[trxId];
         if (saved) {
             document.getElementById('ns_keluar').value = saved.keluar || '';
@@ -694,7 +516,6 @@
             document.getElementById('ns_bayar').value = saved.bayar || '';
         }
 
-        // Tampilkan Modal
         const myModal = new bootstrap.Modal(document.getElementById('modalNomorSurat'));
         myModal.show();
     }
@@ -704,25 +525,18 @@
         loader(true);
         
         const f = e.target;
-        const data = {
-            id_trx: f.id_trx.value,
-            no_keluar: f.no_keluar.value,
-            no_masuk: f.no_masuk.value,
-            no_periksa: f.no_periksa.value,
-            no_terima: f.no_terima.value,
-            no_bayar: f.no_bayar.value
-        };
+        const data = { id_trx: f.id_trx.value, no_keluar: f.no_keluar.value, no_masuk: f.no_masuk.value, no_periksa: f.no_periksa.value, no_terima: f.no_terima.value, no_bayar: f.no_bayar.value };
         
         google.script.run.withSuccessHandler(res => {
             loader(false);
-            // Tutup Modal
             const modalEl = document.getElementById('modalNomorSurat');
             const modal = bootstrap.Modal.getInstance(modalEl);
             modal.hide();
-            
-            // Refresh Tabel
             loadPengaturanNomor();
             alert(res);
         }).saveNomorSuratData(DB_ID, data);
     }
+    
+    // Init Empty Row
+    addRow();
 </script>
