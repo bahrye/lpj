@@ -149,13 +149,51 @@ function processTransaksiLengkap(dbId, header, items) {
 }
 
 function getDashboardStats(dbId) {
-  const ss = SpreadsheetApp.openById(dbId).getSheetByName("Transaksi");
-  const lr = ss.getLastRow();
-  if (lr <= 1) return { total: 0, count: 0 };
-  const values = ss.getRange(2, 9, lr-1, 1).getValues(); 
+  const ss = SpreadsheetApp.openById(dbId);
+  
+  // 1. Ambil Total Anggaran dari Data_Sekolah
+  let totalAnggaran = 0;
+  try {
+    const sSekolah = ss.getSheetByName("Data_Sekolah");
+    if (sSekolah) {
+      const dataSekolah = sSekolah.getDataRange().getValues();
+      // Cari baris dengan kunci 'total_anggaran'
+      const rowAnggaran = dataSekolah.find(r => r[0] === 'total_anggaran');
+      if (rowAnggaran) totalAnggaran = Number(rowAnggaran[1] || 0);
+    }
+  } catch(e) {}
+
+  // 2. Hitung Transaksi
+  const sTrx = ss.getSheetByName("Transaksi");
+  const lr = sTrx.getLastRow();
+  
   let totalBelanja = 0;
-  values.forEach(v => totalBelanja += Number(v[0] || 0));
-  return { total: totalBelanja, count: lr-1 };
+  let uniqueIds = new Set(); // Untuk menyimpan ID unik
+  
+  if (lr > 1) {
+    // Ambil kolom ID (indeks 0) dan Total (indeks 8)
+    // Range: Baris 2, Kolom 1 (A), Sampai Akhir, Ambil 9 kolom (A-I)
+    // ID di index 0, Total di index 8
+    const values = sTrx.getRange(2, 1, lr - 1, 9).getValues(); 
+    
+    values.forEach(v => {
+      const id = v[0];     // Kolom A
+      const total = Number(v[8] || 0); // Kolom I
+      
+      if(id) uniqueIds.add(id); // Masukkan ID ke Set (otomatis unik)
+      totalBelanja += total;
+    });
+  }
+  
+  // 3. Hitung Sisa
+  const sisa = totalAnggaran - totalBelanja;
+
+  return {
+    anggaran: totalAnggaran,
+    belanja: totalBelanja,
+    sisa: sisa,
+    count: uniqueIds.size // Jumlah ID unik
+  };
 }
 
 // --- FUNGSI RIWAYAT & AKSI ---
