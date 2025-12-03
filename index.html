@@ -308,15 +308,21 @@
                                             <label class="form-label fw-bold text-secondary small">Nama Toko</label>
                                             <input type="text" name="nama" id="t_nama" class="form-control" placeholder="Nama Toko Lengkap" required>
                                         </div>
+                                        
                                         <div class="col-md-4">
                                             <label class="form-label fw-bold text-secondary small">Jenis</label>
-                                            <select name="jenis" id="t_jenis" class="form-select">
+                                            <select name="jenis" id="t_jenis" class="form-select" onchange="toggleJenisLainnya()">
                                                 <option value="ATK">ATK</option>
                                                 <option value="Bangunan">Bangunan</option>
                                                 <option value="Elektronik">Elektronik</option>
                                                 <option value="Konsumsi">Konsumsi</option>
                                                 <option value="Lainnya">Lainnya</option>
                                             </select>
+                                        </div>
+
+                                        <div class="col-12 hidden" id="div_jenis_manual">
+                                            <label class="form-label fw-bold text-secondary small">Ketik Jenis Toko (Manual)</label>
+                                            <input type="text" id="t_jenis_manual" class="form-control border-warning" placeholder="Contoh: Fotocopy / Jasa Servis / Lainnya..." style="background-color: #fffdf5;">
                                         </div>
                                     </div>
 
