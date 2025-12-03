@@ -5,6 +5,10 @@
     let DB_ID = localStorage.getItem('bos_db_id');
     let SEKOLAH_NAMA = localStorage.getItem('bos_sekolah_nama');
     
+    // UPDATE: Cache tambahan untuk Dropdown agar mudah switch tab
+    let CACHE_DROPDOWNS = { toko: [], uraian: [], tukang: [] };
+    let TRX_MODE = 'belanja'; // Default: Belanja
+
     // Cache sederhana untuk menyimpan data sementara agar tidak bolak-balik request
     let CACHE_DATA = { 
         Data_Uraian: [], 
@@ -298,17 +302,52 @@
     // 8. TRANSAKSI LOGIC (Input & Kalkulasi)
     // ==========================================
 
+    // UPDATE: Fungsi Load Dropdowns diperbarui untuk support switching
     function loadDropdowns() { 
         google.script.run.withSuccessHandler(res => { 
-            const t = document.getElementById('trxToko');
+            CACHE_DROPDOWNS = res; // Simpan ke global variable
+            
+            // Render Uraian
             const u = document.getElementById('trxUraian'); 
-            
-            t.innerHTML = '<option value="">Pilih...</option>'; 
-            u.innerHTML = '<option value="">Pilih...</option>'; 
-            
-            res.toko.forEach(x => t.add(new Option(x, x))); 
+            u.innerHTML = '<option value="">Pilih Uraian...</option>'; 
             res.uraian.forEach(x => u.add(new Option(x, x))); 
+            
+            // Render Pihak (Toko/Tukang) sesuai mode
+            renderPihakOptions();
+
         }).getDropdownData(DB_ID); 
+    }
+
+    // UPDATE: Fungsi Baru Render Pilihan (Toko/Tukang)
+    function renderPihakOptions() {
+        const p = document.getElementById('trxPihak');
+        p.innerHTML = '<option value="">Pilih...</option>';
+        
+        let listData = (TRX_MODE === 'belanja') ? CACHE_DROPDOWNS.toko : CACHE_DROPDOWNS.tukang;
+        if (listData && listData.length > 0) {
+            listData.forEach(x => p.add(new Option(x, x)));
+        }
+    }
+
+    // UPDATE: Fungsi Switch Mode Tab
+    function switchTrxMode(mode) {
+        TRX_MODE = mode;
+        
+        // Update Class Active Tab
+        document.getElementById('tabBelanja').classList.toggle('active', mode === 'belanja');
+        document.getElementById('tabTukang').classList.toggle('active', mode === 'tukang');
+        
+        // Update Teks Judul & Label
+        if (mode === 'belanja') {
+            document.getElementById('titleTrx').innerText = "Input Transaksi Belanja";
+            document.getElementById('lblPihak').innerText = "Toko";
+        } else {
+            document.getElementById('titleTrx').innerText = "Input Transaksi Tukang";
+            document.getElementById('lblPihak').innerText = "Tukang";
+        }
+        
+        // Render Ulang Dropdown
+        renderPihakOptions();
     }
 
     function addRow() { 
@@ -380,8 +419,12 @@
             document.getElementById('trxBody').innerHTML = ''; 
             document.getElementById('grandTotal').innerText = "Rp. 0";
             addRow();
+            
+            // Kembalikan ke Mode Default
+            switchTrxMode('belanja');
+            
             loadRiwayat();
-            loadStats(); // Refresh dashboard stats agar sisa anggaran update
+            loadStats(); 
         }).processTransaksiLengkap(DB_ID, h, it); 
     }
 
@@ -453,9 +496,17 @@
         const trx = CACHE_DATA.Riwayat[index];
         if (!trx) return;
 
+        // UPDATE LOGIC: Cek apakah nama Toko/Pihak ada di data tukang
+        // Jika iya, switch ke mode Tukang, jika tidak default ke Toko
+        if (CACHE_DROPDOWNS.tukang && CACHE_DROPDOWNS.tukang.includes(trx.toko)) {
+            switchTrxMode('tukang');
+        } else {
+            switchTrxMode('belanja');
+        }
+
         // Isi Form Header
         document.getElementById('trxTanggal').value = trx.tanggal;
-        document.getElementById('trxToko').value = trx.toko;
+        document.getElementById('trxPihak').value = trx.toko; // ID Updated
         document.getElementById('trxUraian').value = trx.uraian;
         document.getElementById('trxBukti').value = trx.no_bukti;
 
