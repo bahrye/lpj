@@ -287,30 +287,44 @@ function saveKopSuratToDrive(dbId, base64Data, mimeType, sekolahName) {
     const file = folder.createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     
-    // SIMPAN ID KE DATA_SEKOLAH
     updateDataSekolahKey(dbId, "id_kop_surat", file.getId());
     
-    return { status: "success", url: "https://drive.google.com/uc?export=view&id=" + file.getId() };
+    // UBAH RETURN VALUE:
+    // Kembalikan Data URI agar frontend bisa langsung preview tanpa reload dari drive
+    const returnData = "data:" + mimeType + ";base64," + base64Data;
+    
+    return { status: "success", url: returnData };
   } catch (e) {
     return { status: "error", message: e.toString() };
   }
 }
 
-// Ambil URL Kop Surat dari Sheet Data_Sekolah
+// GANTI FUNGSI INI DI Kode.gs
 function getKopSuratUrl(dbId) {
   try {
     const ss = SpreadsheetApp.openById(dbId).getSheetByName("Data_Sekolah");
     if (!ss) return null;
     const data = ss.getDataRange().getValues();
     
+    // Cari ID File
     const row = data.find(r => r[0] === "id_kop_surat");
     const fileId = row ? row[1] : null; 
     
     if (fileId) {
-      return "https://drive.google.com/uc?export=view&id=" + fileId;
+      // PERUBAHAN UTAMA: 
+      // Ambil file fisik, konversi ke Base64, lalu kirim string datanya
+      const file = DriveApp.getFileById(fileId);
+      const blob = file.getBlob();
+      const base64Data = Utilities.base64Encode(blob.getBytes());
+      const contentType = blob.getContentType(); // misal: image/png
+      
+      // Return format Data URI
+      return "data:" + contentType + ";base64," + base64Data;
     }
     return null;
-  } catch(e) { return null; }
+  } catch(e) { 
+    return null; // Return null jika error atau file terhapus
+  }
 }
 
 // 2. Data Nomor Surat
