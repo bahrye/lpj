@@ -13,7 +13,7 @@ function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
-// --- FUNGSI BANTUAN: CEK & BUAT SHEET OTOMATIS ---
+// --- FUNGSI BANTUAN ---
 function ensureSheetExists(ss, sheetName) {
   let sheet = ss.getSheetByName(sheetName);
   if (!sheet) {
@@ -85,27 +85,20 @@ function getAllMasterData(dbId, sheetName) {
     const lr = sheet.getLastRow();
     if (lr <= 1) return [];
     
-    // Ambil semua data
     let data = sheet.getRange(2, 1, lr - 1, sheet.getLastColumn()).getValues();
     
-    // --- PERBAIKAN: KONVERSI TANGGAL ---
+    // Format Tanggal
     data = data.map(row => {
       return row.map(cell => {
         if (Object.prototype.toString.call(cell) === '[object Date]') {
-          try {
-            return cell.toISOString().split('T')[0];
-          } catch (e) {
-            return ""; 
-          }
+          try { return cell.toISOString().split('T')[0]; } catch (e) { return ""; }
         }
         return cell;
       });
     });
 
     return data; 
-  } catch (e) { 
-    return []; 
-  }
+  } catch (e) { return []; }
 }
 
 function saveMasterData(dbId, sheetName, dataArray, rowIndex) {
@@ -165,35 +158,74 @@ function getDashboardStats(dbId) {
   return { total: totalBelanja, count: lr-1 };
 }
 
-// --- FUNGSI BARU: AMBIL RIWAYAT TRANSAKSI ---
-function getRiwayatTransaksi(dbId) {
+// --- FUNGSI RIWAYAT & AKSI ---
+
+function getRiwayatTransaksiGrouped(dbId) {
   try {
     const ss = SpreadsheetApp.openById(dbId).getSheetByName("Transaksi");
     const lr = ss.getLastRow();
-    
     if (lr <= 1) return [];
+
+    // Ambil data (Max 100 baris terakhir agar tidak berat, atau ambil semua jika perlu)
+    // Disini kita ambil semua data dulu untuk grouping yang akurat, 
+    // tapi jika data ribuan sebaiknya dilimit.
+    const data = ss.getRange(2, 1, lr - 1, 10).getValues(); 
     
-    // Ambil 50 baris terakhir saja
-    const startRow = Math.max(2, lr - 49);
-    const numRows = lr - startRow + 1;
+    // Grouping berdasarkan ID Transaksi (Kolom Indeks 0)
+    let grouped = {};
     
-    const data = ss.getRange(startRow, 1, numRows, 9).getValues();
+    // Loop dari bawah ke atas agar data terbaru muncul duluan di Object
+    for(let i = data.length - 1; i >= 0; i--) {
+        let row = data[i];
+        let id = row[0];
+        
+        if(!grouped[id]) {
+            let tgl = "";
+            if (row[1] && typeof row[1].getMonth === 'function') {
+                tgl = Utilities.formatDate(row[1], Session.getScriptTimeZone(), "yyyy-MM-dd");
+            }
+            
+            grouped[id] = {
+                id: id,
+                tanggal: tgl,
+                uraian: row[2],
+                toko: row[3],
+                no_bukti: row[9],
+                items: [],
+                total_trx: 0
+            };
+        }
+        
+        grouped[id].items.push({
+            nama: row[4],
+            vol: row[5],
+            sat: row[6],
+            harga: row[7],
+            total: row[8]
+        });
+        
+        grouped[id].total_trx += Number(row[8] || 0);
+    }
     
-    // Reverse agar yang terbaru di atas & format tanggal
-    return data.reverse().map(row => {
-      let tgl = "";
-      if (row[1] && typeof row[1].getMonth === 'function') {
-        tgl = Utilities.formatDate(row[1], Session.getScriptTimeZone(), "dd/MM/yyyy");
-      }
-      return {
-        tanggal: tgl,
-        uraian: row[2],
-        toko: row[3],
-        barang: row[4],
-        total: row[8]
-      };
-    });
+    // Convert Object ke Array
+    return Object.values(grouped);
+    
   } catch (e) {
     return [];
   }
+}
+
+function deleteTransaksiById(dbId, idTrx) {
+    const ss = SpreadsheetApp.openById(dbId).getSheetByName("Transaksi");
+    const data = ss.getDataRange().getValues();
+    let deletedCount = 0;
+    
+    // Loop dari bawah ke atas untuk delete row aman
+    for (let i = data.length - 1; i >= 1; i--) {
+        if (data[i][0] == idTrx) {
+            ss.deleteRow(i + 1);
+            deletedCount++;
+        }
+    }
+    return "Berhasil menghapus transaksi.";
 }
