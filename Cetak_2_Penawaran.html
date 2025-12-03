@@ -1,0 +1,17 @@
+<div class="page">
+    <div class="text-center">
+      <div class="kop-text-toko"><?= trx.toko ?></div>
+      <div class="kop-sub-toko"><?= toko.alamat ?><br>Telp: <?= toko.telp ?></div>
+      <hr style="border-top: 2px solid #000;">
+    </div>
+    <br>
+    <table style="width: 100%;">
+      <tr><td>Hal : <b>Penawaran Harga</b></td><td class="text-right"><?= toko.kota ?>, <?= fmtDate(tanggal.masuk || trx.tanggal) ?></td></tr>
+    </table>
+    <div class="ttd-wrapper">
+      <div class="ttd-box">
+        Hormat Kami,<br>Pimpinan Toko<br><div class="ttd-space"></div>
+        <b><u><?= toko.pemilik ?></u></b>
+      </div>
+    </div>
+</div>
