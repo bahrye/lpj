@@ -1,0 +1,58 @@
+<div class="page">
+    <div class="kop-img-container">
+      <? if (sekolah.kop_base64) { ?>
+        <img src="<?= sekolah.kop_base64 ?>" class="kop-img">
+      <? } else { ?>
+        <h2 style="margin:0"><?= sekolah.sekolah ?></h2>
+        <p style="margin:0"><?= sekolah.alamat ?></p>
+      <? } ?>
+    </div>
+    <div class="garis-kop"></div>
+
+    <table class="meta-table">
+      <tr><td width="60">Nomor</td><td width="10">:</td><td><?= nomor.keluar || "......................." ?></td></tr>
+      <tr><td>Hal</td><td>:</td><td class="text-bold"><?= trx.uraian ?></td></tr>
+      <tr><td>Lamp</td><td>:</td><td>-</td></tr>
+    </table>
+
+    <div class="tujuan-surat">
+      Kepada Yth. Pimp <b><?= trx.toko ?></b><br>Di<br>
+      <div style="margin-top: 2px;"><?= toko.alamat ?></div>
+    </div>
+
+    <p>Assalamualaikum Wr. Wb.</p>
+    <p class="text-justify">
+      Sehubungan dengan adanya kegiatan <b><?= trx.uraian ?></b> di <b><?= sekolah.sekolah ?></b>, 
+      dengan ini kami memohon kiranya berkenan untuk menyediakan daftar barang dibawah pada tanggal 
+      <b><?= fmtDate(tanggal.periksa || trx.tanggal) ?></b> dengan perincian sebagai berikut:
+    </p>
+
+    <table class="table-request">
+      <thead>
+        <tr><th width="5%">No</th><th>JENIS BARANG</th><th width="15%">BANYAKNYA</th><th width="15%">SATUAN</th></tr>
+      </thead>
+      <tbody>
+        <? for(var i=0; i<items.length; i++) { ?>
+        <tr>
+          <td class="text-center"><?= i+1 ?></td>
+          <td><?= items[i].nama ?></td>
+          <td class="text-center"><?= items[i].vol ?></td>
+          <td class="text-center"><?= items[i].sat ?></td>
+        </tr>
+        <? } ?>
+        <? for(var j=items.length; j<15; j++) { ?>
+        <tr><td class="text-center">&nbsp;</td><td></td><td></td><td></td></tr>
+        <? } ?>
+      </tbody>
+    </table>
+
+    <p style="margin-top: 15px;">Demikian yang menjadi penyampaian kami, atas kerja samanya kami ucapkan terima kasih.</p>
+    
+    <div class="ttd-wrapper">
+      <div class="ttd-box">
+        <?= sekolah.kota ?>, <?= fmtDate(nomor.tgl_surat_keluar || trx.tanggal) ?><br>Hormat Kami,<br>
+        <div class="ttd-space"></div>
+        <b class="text-underline"><?= sekolah.bendahara ?></b>
+      </div>
+    </div>
+</div>
