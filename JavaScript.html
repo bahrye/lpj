@@ -500,20 +500,32 @@
         
         document.getElementById('ns_jenis_pihak').value = isTukang ? 'tukang' : 'toko';
         
+        // --- PERUBAHAN DI SINI (DISABLE vs HIDDEN) ---
+        const inputMasuk = document.getElementById('ns_masuk');
+        
         if (isTukang) {
-            document.getElementById('div_ns_masuk').classList.add('hidden');
+            // Jika Tukang: Disable input nomor nota, ubah label dinamis
+            inputMasuk.disabled = true;
+            inputMasuk.value = ""; // Kosongkan nilai
+            inputMasuk.placeholder = "Tidak perlu diisi (Jasa Tukang)";
+            
             document.getElementById('lbl_ns_periksa').innerText = "Pekerjaan"; 
             document.getElementById('lbl_ns_terima').innerText = "Pekerjaan";  
         } else {
-            document.getElementById('div_ns_masuk').classList.remove('hidden');
+            // Jika Toko: Enable input
+            inputMasuk.disabled = false;
+            inputMasuk.placeholder = "Nomor Nota/Faktur";
+            
             document.getElementById('lbl_ns_periksa').innerText = "Barang";
             document.getElementById('lbl_ns_terima').innerText = "Barang";
         }
+        // ---------------------------------------------
 
         const saved = CACHE_NOMOR_SURAT[trxId];
         if (saved) {
             document.getElementById('ns_keluar').value = saved.keluar || '';
-            document.getElementById('ns_masuk').value = saved.masuk || '';
+            // Hanya isi jika tidak disabled (atau biarkan kosong jika tukang)
+            if (!isTukang) document.getElementById('ns_masuk').value = saved.masuk || '';
             document.getElementById('ns_periksa').value = saved.periksa || '';
             document.getElementById('ns_terima').value = saved.terima || '';
             document.getElementById('ns_bayar').value = saved.bayar || '';
@@ -594,27 +606,35 @@
         document.getElementById('formTanggalSurat').reset();
         document.getElementById('ts_id_trx').value = trxId;
         
-        // Cek apakah Tukang atau Toko (Logika sama dengan Nomor Surat)
+        // Cek apakah Tukang atau Toko
         let isTukang = false;
         if (CACHE_DROPDOWNS.tukang && CACHE_DROPDOWNS.tukang.includes(pihakName)) isTukang = true;
         
         document.getElementById('ts_jenis_pihak').value = isTukang ? 'tukang' : 'toko';
         
-        // Atur Label (Barang vs Pekerjaan) & Hide Input Nota
+        // --- PERUBAHAN DI SINI (DISABLE vs HIDDEN) ---
+        const inputTglMasuk = document.getElementById('ts_masuk');
+
         if (isTukang) {
-            document.getElementById('div_ts_masuk').classList.add('hidden'); // Sembunyikan tgl nota toko
+            // Jika Tukang: Disable input tanggal nota
+            inputTglMasuk.disabled = true;
+            inputTglMasuk.value = ""; // Pastikan kosong
+            
             document.getElementById('lbl_ts_periksa').innerText = "Pekerjaan"; 
             document.getElementById('lbl_ts_terima').innerText = "Pekerjaan";  
         } else {
-            document.getElementById('div_ts_masuk').classList.remove('hidden');
+            // Jika Toko: Enable input
+            inputTglMasuk.disabled = false;
+            
             document.getElementById('lbl_ts_periksa').innerText = "Barang";
             document.getElementById('lbl_ts_terima').innerText = "Barang";
         }
+        // ---------------------------------------------
 
         // Isi data jika sudah ada di Cache
         const saved = CACHE_TANGGAL_SURAT[trxId];
         if (saved) {
-            document.getElementById('ts_masuk').value = saved.masuk || '';
+            if (!isTukang) document.getElementById('ts_masuk').value = saved.masuk || '';
             document.getElementById('ts_periksa').value = saved.periksa || '';
             document.getElementById('ts_terima').value = saved.terima || '';
             document.getElementById('ts_bayar').value = saved.bayar || '';
