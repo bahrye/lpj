@@ -1,0 +1,48 @@
+<div class="page">
+    <div class="kop-img-container">
+      <? if (sekolah.kop_base64) { ?> 
+        <img src="<?= sekolah.kop_base64 ?>" class="kop-img"> 
+      <? } else { ?>
+        <h2 style="margin:0"><?= sekolah.sekolah ?></h2>
+        <p style="margin:0"><?= sekolah.alamat ?></p>
+      <? } ?>
+    </div>
+    <div class="garis-kop"></div>
+    
+    <div class="judul-halaman">BERITA ACARA PEMERIKSAAN BARANG</div>
+    <div class="text-center">Nomor: <?= nomor.periksa || "......................." ?></div>
+    <br>
+    <p class="text-justify">
+      Pada hari ini <b><?= hari(tanggal.periksa || trx.tanggal) ?></b> tanggal <b><?= terbilangTanggal(tanggal.periksa || trx.tanggal) ?></b>, telah diadakan pemeriksaan terhadap pengadaan barang/jasa yang dipesan dari <b><?= trx.toko ?></b> sesuai Nota/Faktur Nomor: <?= nomor.masuk || "-" ?>.
+    </p>
+    <p>Hasil pemeriksaan adalah sebagai berikut:</p>
+    <table class="table-data">
+      <thead><tr><th>No</th><th>Nama Barang</th><th>Banyaknya</th><th>Harga Satuan</th><th>Jumlah Harga</th></tr></thead>
+      <tbody>
+        <? for(var i=0; i<items.length; i++) { ?>
+        <tr>
+          <td class="text-center"><?= i+1 ?></td>
+          <td><?= items[i].nama ?></td>
+          <td class="text-center"><?= items[i].vol ?> <?= items[i].sat ?></td>
+          <td class="text-right"><?= fmtRupiah(items[i].harga) ?></td>
+          <td class="text-right"><?= fmtRupiah(items[i].total) ?></td>
+        </tr>
+        <? } ?>
+        <tr><td colspan="4" class="text-center text-bold">TOTAL</td><td class="text-right text-bold"><?= fmtRupiah(trx.total_trx) ?></td></tr>
+      </tbody>
+    </table>
+    <p>Barang tersebut telah diperiksa dan dinyatakan <b>LENGKAP dan BAIK</b> sesuai pesanan.</p>
+    
+    <table style="width: 100%; margin-top: 30px;">
+      <tr>
+        <td class="text-center" width="50%">
+          Pimpinan Toko,<br><div class="ttd-space"></div>
+          <b><u><?= toko.pemilik ?></u></b>
+        </td>
+        <td class="text-center" width="50%">
+          Yang Memesan (Bendahara),<br><div class="ttd-space"></div>
+          <b><u><?= sekolah.bendahara ?></u></b><br>NIP. <?= sekolah.nip_bendahara ?>
+        </td>
+      </tr>
+    </table>
+</div>
