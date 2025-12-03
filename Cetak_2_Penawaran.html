@@ -1,17 +1,94 @@
 <div class="page">
     <div class="text-center">
-      <div class="kop-text-toko"><?= trx.toko ?></div>
-      <div class="kop-sub-toko"><?= toko.alamat ?><br>Telp: <?= toko.telp ?></div>
-      <hr style="border-top: 2px solid #000;">
+      <div style="font-size: 16pt; font-weight: bold; font-family: 'Times New Roman', serif;">
+        <?= trx.toko ?>
+      </div>
+      <div style="font-size: 11pt; margin-bottom: 2px;">
+        <?= toko.jenis || "Jual ATK dan Keperluan Kantor" ?>
+      </div>
+      <div style="font-size: 10pt;">
+        Alamat: <?= toko.alamat ?>, Telp/Hp. <?= toko.telp ?>
+      </div>
+      <div style="border-bottom: 3px double #000; margin-top: 5px; width: 100%;"></div>
     </div>
-    <br>
-    <table style="width: 100%;">
-      <tr><td>Hal : <b>Penawaran Harga</b></td><td class="text-right"><?= toko.kota ?>, <?= fmtDate(tanggal.masuk || trx.tanggal) ?></td></tr>
+
+    <div style="margin-top: 20px; width: 100%; display: flex; justify-content: flex-end;">
+        <div style="width: 50%;">
+            <table style="width: 100%; font-size: 11pt;">
+                <tr>
+                    <td style="vertical-align: top;">Kepada Yth.</td>
+                    <td>
+                        <b>Kepala <?= sekolah.sekolah ?></b><br>
+                        Di<br>
+                        <span style="padding-left: 10px;"><?= sekolah.alamat ?></span>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <p style="margin-top: 20px;">Assalamu’alaikum Wr. Wb.</p>
+    
+    <p class="text-justify" style="line-height: 1.5;">
+      Sehubungan dengan Nota Pesanan Bapak Nomor: <?= nomor.keluar || "......................." ?> 
+      tanggal <?= fmtDate(trx.tanggal) ?> perihal kegiatan <b><?= trx.uraian ?></b>, 
+      maka kami menawarkan harga barang tersebut dengan perincian sebagai berikut :
+    </p>
+
+    <table class="table-data" style="margin-top: 10px; width: 100%;">
+      <thead>
+        <tr>
+          <th width="5%" class="text-center">NO</th>
+          <th class="text-center">JENIS BARANG</th>
+          <th width="15%" class="text-center">BANYAKNYA</th>
+          <th width="18%" class="text-center">HARGA SATUAN (Rp)</th>
+          <th width="18%" class="text-center">HARGA (Rp)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <? for(var i=0; i<items.length; i++) { ?>
+        <tr>
+          <td class="text-center"><?= i+1 ?></td>
+          <td style="padding-left: 5px;"><?= items[i].nama ?></td>
+          <td class="text-center"><?= items[i].vol ?> <?= items[i].sat ?></td>
+          <td class="text-right" style="padding-right: 5px;"><?= fmtRupiah(items[i].harga) ?></td>
+          <td class="text-right" style="padding-right: 5px;"><?= fmtRupiah(items[i].total) ?></td>
+        </tr>
+        <? } ?>
+        
+        <? 
+           /* LOGIKA BARIS KOSONG (SAMA SEPERTI HALAMAN 1) */
+           var minRows = 8; 
+           var dataCount = items.length;
+           var emptyRowsNeeded = minRows - dataCount;
+           if (emptyRowsNeeded < 0) emptyRowsNeeded = 0; 
+        ?>
+        
+        <? for(var j=0; j<emptyRowsNeeded; j++) { ?>
+        <tr>
+          <td class="text-center" style="height: 22px;">&nbsp;</td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>
+        <? } ?>
+        
+        <tr>
+            <td colspan="4" class="text-center text-bold">Total Bayar</td>
+            <td class="text-right text-bold" style="padding-right: 5px;"><?= fmtRupiah(trx.total_trx) ?></td>
+        </tr>
+      </tbody>
     </table>
+
+    <p style="margin-top: 15px;">Demikian yang menjadi penawaran kami, atas kerja samanya kami ucapkan terima kasih.</p>
+    
     <div class="ttd-wrapper">
-      <div class="ttd-box">
-        Hormat Kami,<br>Pimpinan Toko<br><div class="ttd-space"></div>
-        <b><u><?= toko.pemilik ?></u></b>
+      <div class="ttd-box text-center" style="width: 250px;">
+        <?= toko.kota ?>, <?= fmtDate(tanggal.masuk || trx.tanggal) ?><br>
+        Hormat Kami<br>
+        <div class="ttd-space"></div>
+        <b class="text-underline"><?= toko.pemilik ?></b>
       </div>
     </div>
 </div>
