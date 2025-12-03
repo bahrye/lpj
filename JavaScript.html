@@ -445,6 +445,8 @@
 
     function loadExistingKop() {
         google.script.run.withSuccessHandler(url => {
+            // Karena server sekarang mengirim string "data:image/png;base64,....."
+            // Maka src akan langsung mengenali gambar tersebut.
             if(url) {
                 document.getElementById('previewImgKop').src = url;
                 document.getElementById('previewImgKop').style.display = 'block';
