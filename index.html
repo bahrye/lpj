@@ -28,10 +28,32 @@
         <button type="submit" class="btn btn-primary w-100">Masuk Aplikasi</button>
       </form>
       <form id="formRegister" class="hidden" onsubmit="handleRegister(event)">
-        <div class="mb-3"><input type="text" name="sekolah" class="form-control" placeholder="Nama Sekolah Lengkap" required></div>
-        <div class="mb-3"><input type="email" name="email" class="form-control" placeholder="Email Aktif" required></div>
-        <div class="mb-3"><input type="password" name="password" class="form-control" placeholder="Password" required></div>
-        <button type="submit" class="btn btn-success w-100">Buat Akun & Database</button>
+        
+        <div class="mb-3">
+          <input type="text" name="npsn" class="form-control" placeholder="NPSN Sekolah" required pattern="[0-9]+" title="Hanya angka">
+        </div>
+
+        <div class="mb-3">
+          <input type="text" name="sekolah" class="form-control" placeholder="Nama Sekolah Lengkap" required>
+        </div>
+        
+        <div class="mb-3">
+          <div class="input-group">
+            <input type="email" id="regEmail" name="email" class="form-control" placeholder="Email Aktif" required>
+            <button type="button" class="btn btn-secondary" onclick="requestOtp()" id="btnKirimOtp">Kirim OTP</button>
+          </div>
+          <small class="text-muted" style="font-size: 0.8rem;">*Klik Kirim OTP untuk mendapatkan kode verifikasi di email.</small>
+        </div>
+
+        <div class="mb-3 hidden" id="divOtpInput">
+          <input type="text" name="otp_code" class="form-control border-success" placeholder="Masukkan Kode OTP dari Email" required>
+        </div>
+
+        <div class="mb-3">
+          <input type="password" name="password" class="form-control" placeholder="Password" required>
+        </div>
+        
+        <button type="submit" class="btn btn-success w-100" id="btnDaftarFinal" disabled>Buat Akun & Database</button>
       </form>
     </div>
   </div>
