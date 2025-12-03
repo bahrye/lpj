@@ -1,0 +1,38 @@
+<div class="page">
+    <div class="text-center">
+      <div class="kop-text-toko"><?= trx.toko ?></div>
+      <div class="kop-sub-toko"><?= toko.alamat ?></div>
+      <hr style="border-top: 2px solid #000;">
+    </div>
+    <div class="text-center" style="font-size: 16pt; font-weight: bold; margin: 20px 0;">F A K T U R</div>
+    <div>Nomor: <?= nomor.masuk || "......................." ?></div>
+    <table class="table-data">
+      <thead><tr><th>No</th><th>Nama Barang</th><th>Qty</th><th>Satuan</th><th>Harga @</th><th>Total</th></tr></thead>
+      <tbody>
+        <? for(var i=0; i<items.length; i++) { ?>
+        <tr>
+          <td class="text-center"><?= i+1 ?></td>
+          <td><?= items[i].nama ?></td>
+          <td class="text-center"><?= items[i].vol ?></td>
+          <td class="text-center"><?= items[i].sat ?></td>
+          <td class="text-right"><?= fmtRupiah(items[i].harga) ?></td>
+          <td class="text-right"><?= fmtRupiah(items[i].total) ?></td>
+        </tr>
+        <? } ?>
+        <tr><td colspan="5" class="text-center text-bold">TOTAL TAGIHAN</td><td class="text-right text-bold"><?= fmtRupiah(trx.total_trx) ?></td></tr>
+      </tbody>
+    </table>
+    <div style="margin-top: 10px; font-style: italic;">Terbilang: # <?= terbilang(trx.total_trx) ?> Rupiah #</div>
+    <table style="width: 100%; margin-top: 30px;">
+      <tr>
+        <td class="text-center" width="50%">
+          Yang Menerima,<br><div class="ttd-space"></div>
+          <b><u><?= sekolah.kepsek ?></u></b>
+        </td>
+        <td class="text-center" width="50%">
+          Hormat Kami,<br><div class="ttd-space"></div>
+          <b><u><?= toko.pemilik ?></u></b>
+        </td>
+      </tr>
+    </table>
+</div>
