@@ -20,7 +20,6 @@ function ensureSheetExists(ss, sheetName) {
     sheet = ss.insertSheet(sheetName);
     // Header Default untuk Sheet Baru
     if (sheetName === "Data_Toko") {
-      // GANTI HEADER "Tanggal TTD" MENJADI "Tempat TTD"
       sheet.appendRow(["Nama Toko", "Jenis Toko", "Alamat Toko", "No. Telp", "Pemilik", "Tempat TTD"]);
     } else if (sheetName === "Data_Uraian") {
       sheet.appendRow(["Kode Rekening", "Nama Uraian Belanja"]);
@@ -64,13 +63,7 @@ function sendOtpRegistration(email) {
   const data = ssMaster.getDataRange().getValues();
   
   // Cek apakah email sudah terdaftar
-  // Perhatikan: Karena struktur berubah, kita harus pastikan index email dicek dengan benar nanti.
-  // Tapi untuk saat ini kita cek loop manual. 
-  // Jika struktur LAMA: Email index 2. Jika BARU: Email index 3.
-  // Untuk aman, kita asumsikan User belum mengubah sheet, jadi kita cek dua-duanya atau pakai find.
-  
   for (let i = 1; i < data.length; i++) {
-    // Cek index 2 (lama) atau 3 (baru)
     if (data[i][2] == email || data[i][3] == email) {
         return { status: "error", message: "Email sudah terdaftar!" };
     }
@@ -79,8 +72,7 @@ function sendOtpRegistration(email) {
   // Generate 6 Digit Code
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   
-  // Simpan OTP di Script Properties (Berlaku global untuk script ini)
-  // Format Key: "OTP_emailuser@gmail.com"
+  // Simpan OTP di Script Properties
   const props = PropertiesService.getScriptProperties();
   props.setProperty("OTP_" + email, otp);
   
@@ -126,16 +118,12 @@ function registerUserVerified(form) {
     const newFile = templateFile.makeCopy("DB BOS - " + form.sekolah);
     const newDbId = newFile.getId();
     
-    // === PERBAIKAN: TRY-CATCH UNTUK IZIN ===
-    // Mencoba memberi akses edit, tapi jika gagal (misal email bukan Google),
-    // proses TIDAK akan berhenti/error. Database tetap jadi.
+    // Try add editor
     try {
       newFile.addEditor(form.email);
     } catch (permErr) {
       console.log("Peringatan Izin: " + permErr.toString());
-      // Lanjut saja, jangan throw error
     }
-    // ========================================
 
     // 3. Inject Data Sekolah
     try {
@@ -174,28 +162,19 @@ function registerUserVerified(form) {
   }
 }
 
-// --- UPDATE FUNGSI LOGIN (PENTING!) ---
-// Karena kita menambah kolom NPSN di urutan ke-2 (index 1), maka kolom setelahnya bergeser.
+// --- LOGIN ---
 function loginUser(form) {
   const ssMaster = SpreadsheetApp.openById(ID_DB_MASTER).getSheetByName("Users");
   const data = ssMaster.getDataRange().getValues();
   
-  // Asumsi Struktur Kolom: 
-  // 0: Date, 1: NPSN, 2: Sekolah, 3: Email, 4: Password, 5: Token/FileId
-  
   for (let i = 1; i < data.length; i++) {
-    // Cek Email (Kolom Index 3) & Password (Kolom Index 4)
-    // KITA PAKAI LOGIKA GANDA UNTUK MENGANTISIPASI DATA LAMA vs BARU
-    
-    // Cek Format Baru (Ada NPSN) - Jika kolom terakhir ada di index 5
+    // Format Baru (Ada NPSN, index 5)
     if (data[i].length >= 6) { 
        if (data[i][3] == form.email && data[i][4] == form.password) {
          return { status: "success", token: data[i][5], sekolah: data[i][2] }; 
        }
     }
-    
-    // Fallback: Cek Format Lama (Tanpa NPSN) - Jika kolomnya cuma 5
-    // 0: Date, 1: Sekolah, 2: Email, 3: Password, 4: Token
+    // Format Lama (Tanpa NPSN)
     if (data[i][2] == form.email && data[i][3] == form.password) {
        return { status: "success", token: data[i][4], sekolah: data[i][1] }; 
     }
@@ -294,44 +273,38 @@ function getDropdownData(dbId) {
     const sToko = ensureSheetExists(ss, "Data_Toko");
     const sUraian = ensureSheetExists(ss, "Data_Uraian");
     const sTukang = ensureSheetExists(ss, "Data_Tukang");
-    // --- TAMBAHAN: LOAD DATA GURU ---
     const sGuru = ensureSheetExists(ss, "Data_Guru"); 
 
     const dataToko = sToko.getLastRow() > 1 ? sToko.getRange(2, 1, sToko.getLastRow()-1, 1).getValues().flat() : [];
     const dataUraian = sUraian.getLastRow() > 1 ? sUraian.getRange(2, 2, sUraian.getLastRow()-1, 1).getValues().flat() : [];
     const dataTukang = sTukang.getLastRow() > 1 ? sTukang.getRange(2, 1, sTukang.getLastRow()-1, 1).getValues().flat() : [];
-    // --- AMBIL KOLOM NAMA GURU (Index 1) ---
     const dataGuru = sGuru.getLastRow() > 1 ? sGuru.getRange(2, 1, sGuru.getLastRow()-1, 1).getValues().flat() : [];
 
     return { toko: dataToko, uraian: dataUraian, tukang: dataTukang, guru: dataGuru }; 
   } catch (e) { return { toko: [], uraian: [], tukang: [], guru: [] }; }
 }
 
-// --- TRANSAKSI (LOGIKA UTAMA) ---
+// --- TRANSAKSI ---
 
-// Fungsi ini menangani Simpan Baru dan Update (Edit)
 function processTransaksiLengkap(dbId, header, items, idEdit) {
   const ss = SpreadsheetApp.openById(dbId).getSheetByName("Transaksi");
   let idTrx;
 
-  // 1. Cek apakah ini mode EDIT (Update)
+  // 1. Cek Mode EDIT
   if (idEdit && idEdit !== "") {
-    idTrx = idEdit; // Gunakan ID lama agar relasi ke tabel lain (Nomor Surat) tidak putus
-    
-    // Hapus data lama yang punya ID ini
+    idTrx = idEdit; 
     const data = ss.getDataRange().getValues();
-    // Loop mundur untuk aman saat delete row
     for (let i = data.length - 1; i >= 1; i--) {
       if (data[i][0] == idEdit) {
         ss.deleteRow(i + 1);
       }
     }
   } else {
-    // 2. Jika mode BARU (Create), generate ID baru
+    // 2. Mode BARU
     idTrx = "TRX-" + new Date().getTime(); 
   }
 
-  // 3. Susun data baru
+  // 3. Susun data
   let rowsToSave = [];
   items.forEach(item => {
     rowsToSave.push([
@@ -349,7 +322,7 @@ function processTransaksiLengkap(dbId, header, items, idEdit) {
     ]);
   });
 
-  // 4. Simpan ke sheet
+  // 4. Simpan
   if (rowsToSave.length > 0) {
     ss.getRange(ss.getLastRow() + 1, 1, rowsToSave.length, rowsToSave[0].length).setValues(rowsToSave);
   }
@@ -396,7 +369,6 @@ function getRiwayatTransaksiGrouped(dbId) {
     const lr = ss.getLastRow();
     if (lr <= 1) return [];
 
-    // UBAH RANGE: Ambil sampai 11 kolom (sebelumnya 10)
     const data = ss.getRange(2, 1, lr - 1, 11).getValues(); 
     let grouped = {};
     
@@ -415,7 +387,7 @@ function getRiwayatTransaksiGrouped(dbId) {
                 uraian: row[2],
                 toko: row[3],
                 no_bukti: row[9],
-                pemesan: row[10] || "", // <--- TAMBAHAN BACA DATA
+                pemesan: row[10] || "", 
                 items: [],
                 total_trx: 0
             };
@@ -443,9 +415,8 @@ function deleteTransaksiById(dbId, idTrx) {
     return "Berhasil menghapus transaksi.";
 }
 
-// --- PENGATURAN CETAK (KOP, NOMOR, TANGGAL) ---
+// --- PENGATURAN CETAK ---
 
-// 1. Kop Surat
 function saveKopSuratToDrive(dbId, base64Data, mimeType, sekolahName) {
   try {
     const folderName = "LPJ_Attachments";
@@ -482,7 +453,6 @@ function getKopSuratUrl(dbId) {
   } catch(e) { return null; }
 }
 
-// 2. Nomor Surat
 function getNomorSuratData(dbId) {
   try {
     const ss = SpreadsheetApp.openById(dbId);
@@ -512,7 +482,6 @@ function saveNomorSuratData(dbId, formData) {
   } catch (e) { return "Error: " + e.toString(); }
 }
 
-// 3. Tanggal Surat
 function getTanggalSuratData(dbId) {
   try {
     const ss = SpreadsheetApp.openById(dbId);
@@ -557,12 +526,8 @@ function terbilang(nilai) {
   var tingkat = new Array('', 'Ribu', 'Juta', 'Milyar', 'Trilyun');
   var panjang_bilangan = bilangan.length;
 
-  /* pengujian panjang bilangan */
-  if (panjang_bilangan > 15) {
-    return "Diluar Batas";
-  }
+  if (panjang_bilangan > 15) return "Diluar Batas";
 
-  /* mengambil angka-angka yang ada dalam bilangan, dimasukkan ke dalam array */
   for (var i = 1; i <= panjang_bilangan; i++) {
     angka[i] = bilangan.substr(-(i), 1);
   }
@@ -571,85 +536,82 @@ function terbilang(nilai) {
   var j = 0;
   var kalimat = "";
 
-  /* mulai proses iterasi terhadap array angka */
   while (i <= panjang_bilangan) {
     var subkalimat = "";
     var kata1 = "";
     var kata2 = "";
     var kata3 = "";
 
-    /* untuk Ratusan */
+    /* Ratusan */
     if (angka[i + 2] != "0") {
-      if (angka[i + 2] == "1") {
-        kata1 = "Seratus";
-      } else {
-        kata1 = kata[angka[i + 2]] + " Ratus";
-      }
+      if (angka[i + 2] == "1") kata1 = "Seratus";
+      else kata1 = kata[angka[i + 2]] + " Ratus";
     }
 
-    /* untuk Puluhan atau Belasan */
+    /* Puluhan/Belasan */
     if (angka[i + 1] != "0") {
       if (angka[i + 1] == "1") {
-        if (angka[i] == "0") {
-          kata2 = "Sepuluh";
-        } else if (angka[i] == "1") {
-          kata2 = "Sebelas";
-        } else {
-          kata2 = kata[angka[i]] + " Belas";
-        }
+        if (angka[i] == "0") kata2 = "Sepuluh";
+        else if (angka[i] == "1") kata2 = "Sebelas";
+        else kata2 = kata[angka[i]] + " Belas";
       } else {
         kata2 = kata[angka[i + 1]] + " Puluh";
       }
     }
 
-    /* untuk Satuan */
+    /* Satuan */
     if (angka[i] != "0") {
-      if (angka[i + 1] != "1") {
-        kata3 = kata[angka[i]];
-      }
+      if (angka[i + 1] != "1") kata3 = kata[angka[i]];
     }
 
-    /* pengujian angka apakah tidak nol semua, lalu ditambahkan tingkat */
     if ((angka[i] != "0") || (angka[i + 1] != "0") || (angka[i + 2] != "0")) {
       subkalimat = kata1 + " " + kata2 + " " + kata3 + " " + tingkat[j] + " ";
     }
 
-    /* gabungkan variabe sub kalimat (untuk Satu blok 3 angka) ke variabel kalimat */
     kalimat = subkalimat + kalimat;
     i = i + 3;
     j = j + 1;
   }
 
-  /* mengganti Satu Ribu jadi Seribu jika diperlukan */
-  if ((angka[5] == "0") && (angka[6] == "0")) {
-    kalimat = kalimat.replace("Satu Ribu", "Seribu");
-  }
+  if ((angka[5] == "0") && (angka[6] == "0")) kalimat = kalimat.replace("Satu Ribu", "Seribu");
 
   return kalimat.trim();
 }
 
 function generatePDFLaporan(dbId, idTrx) {
   try {
-    // 1. Ambil Data Transaksi & Item
+    // 1. Ambil Data Transaksi
     const ss = SpreadsheetApp.openById(dbId);
     const dataTrxRaw = getRiwayatTransaksiGrouped(dbId);
     const trx = dataTrxRaw.find(t => t.id === idTrx);
     if (!trx) throw new Error("Transaksi tidak ditemukan");
 
+    // --- CARI NIP PEMESAN ---
+    trx.nip_pemesan = "-"; // Default
+    try {
+      const sGuru = ss.getSheetByName("Data_Guru");
+      if (sGuru) {
+        const dataGuru = sGuru.getDataRange().getValues();
+        for(let i=1; i<dataGuru.length; i++) {
+           if (dataGuru[i][0] === trx.pemesan) {
+              let nipVal = dataGuru[i][1];
+              if (nipVal) {
+                 trx.nip_pemesan = String(nipVal).replace(/^'/, "");
+              }
+              break;
+           }
+        }
+      }
+    } catch(e) { console.log("Gagal ambil NIP Pemesan: " + e); }
+
     // 2. Ambil Data Sekolah & Kop
     const sekolah = getDataSekolah(dbId);
     const kopUrl = getKopSuratUrl(dbId); 
     sekolah.kop_base64 = kopUrl;
-    
-    // --- UPDATE LOGIKA: GUNAKAN ALAMAT TTD LANGSUNG ---
-    // Variabel sekolah.kota digunakan sebagai lokasi penandatanganan di template
-    // Mengambil langsung dari input 'alamat_ttd'
     sekolah.kota = sekolah.alamat_ttd || "Kab. Bulukumba"; 
-    
-    // Pastikan sekolah.alamat tidak null untuk mencegah error di Kop (meskipun mungkin kosong/lama)
     if (!sekolah.alamat) sekolah.alamat = ""; 
 
-    // 3. Ambil Data Pihak (Toko atau Tukang)
+    // 3. Ambil Data Pihak (Toko/Tukang)
     let dataToko = {};
     const sToko = ss.getSheetByName("Data_Toko");
     
@@ -662,7 +624,7 @@ function generatePDFLaporan(dbId, idTrx) {
           alamat: found[2], 
           telp: found[3], 
           pemilik: found[4], 
-          kota: found[5] || sekolah.kota // Jika Toko tidak punya Tempat TTD, gunakan TTD Sekolah
+          kota: found[5] || sekolah.kota 
         };
       } else {
          const sTukang = ss.getSheetByName("Data_Tukang");
@@ -682,21 +644,17 @@ function generatePDFLaporan(dbId, idTrx) {
       }
     }
 
-    // 4. Ambil Data Nomor Surat & Tanggal Surat
+    // 4. Data Nomor & Tanggal
     const mapNomor = getNomorSuratData(dbId);
     const mapTanggal = getTanggalSuratData(dbId);
     const dataNomor = mapNomor[idTrx] || {};
     const dataTanggal = mapTanggal[idTrx] || {};
 
-    // 5. GABUNGKAN TEMPLATE HTML (PERBAIKAN DI SINI)
-    // Gunakan .getRawContent() agar tag <? ?> terbaca sebagai kode, bukan teks.
+    // 5. Gabungkan Template
     var htmlContentString = '<!DOCTYPE html><html><head>';
-    
-    // CSS boleh pakai createHtmlOutputFromFile karena isinya cuma style
     htmlContentString += HtmlService.createHtmlOutputFromFile('CetakCSS').getContent();
     htmlContentString += '</head><body>';
     
-    // FILE HTML HARUS PAKAI createTemplateFromFile(...).getRawContent()
     htmlContentString += HtmlService.createTemplateFromFile('Cetak_1_Permintaan').getRawContent();
     htmlContentString += HtmlService.createTemplateFromFile('Cetak_2_Penawaran').getRawContent();
     htmlContentString += HtmlService.createTemplateFromFile('Cetak_3_Pemeriksaan').getRawContent();
@@ -707,10 +665,8 @@ function generatePDFLaporan(dbId, idTrx) {
     
     htmlContentString += '</body></html>';
 
-    // 6. Buat Template Object dari String Gabungan tadi
     const template = HtmlService.createTemplate(htmlContentString);
 
-    // 7. Inject Variabel Data
     template.trx = trx;
     template.items = trx.items;
     template.sekolah = sekolah;
@@ -718,31 +674,45 @@ function generatePDFLaporan(dbId, idTrx) {
     template.nomor = dataNomor;
     template.tanggal = dataTanggal;
 
-    // 8. Definisi Fungsi Helper
-    template.fmtRupiah = function(n) { 
-      return "Rp " + new Intl.NumberFormat('id-ID').format(n); 
-    };
+    // --- HELPER FORMATTING (BAHASA INDONESIA) ---
+    template.fmtRupiah = function(n) { return "Rp " + new Intl.NumberFormat('id-ID').format(n); };
+
+    const namaBulanIndo = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+
+    // Fungsi Format Tanggal Indo (Manual agar Mei, Agustus, dll benar)
     template.fmtDate = function(d) {
        if(!d) return "";
-       return Utilities.formatDate(new Date(d), "GMT+8", "dd MMMM yyyy");
-    };
-    template.hari = function(d) {
-      if(!d) return "";
-      const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-      return days[new Date(d).getDay()];
-    };
-    template.terbilang = terbilang; 
-    template.terbilangTanggal = function(d) {
-       if(!d) return "";
-       return Utilities.formatDate(new Date(d), "GMT+8", "dd MMMM yyyy");
+       // Konversi ke Timezone +8 lalu split agar dapat angka pasti
+       var dateString = Utilities.formatDate(new Date(d), "GMT+8", "yyyy-MM-dd");
+       var parts = dateString.split("-");
+       var year = parts[0];
+       var monthIndex = parseInt(parts[1], 10) - 1; // 0-11
+       var day = parseInt(parts[2], 10); // Hilangkan 0 depan
+       
+       return day + " " + namaBulanIndo[monthIndex] + " " + year;
     };
 
-    // 9. Evaluasi Template
+    template.hari = function(d) {
+      if(!d) return "";
+      // Dapatkan nama hari Inggris dari timezone yang benar
+      var dayNameEng = Utilities.formatDate(new Date(d), "GMT+8", "EEEE");
+      var mapHari = {
+        "Sunday": "Minggu", "Monday": "Senin", "Tuesday": "Selasa", "Wednesday": "Rabu",
+        "Thursday": "Kamis", "Friday": "Jumat", "Saturday": "Sabtu"
+      };
+      return mapHari[dayNameEng] || dayNameEng;
+    };
+    
+    template.terbilang = terbilang; 
+    
+    // Gunakan fmtDate yang sama untuk terbilangTanggal
+    template.terbilangTanggal = template.fmtDate;
+
+    // ---------------------------------------------
+
     const finalHtml = template.evaluate().getContent();
     
-    // 10. Konversi ke PDF
     const blob = Utilities.newBlob(finalHtml, MimeType.HTML).setName("Laporan_" + idTrx + ".pdf");
-    
     const folderName = "LPJ_Attachments";
     const folders = DriveApp.getFoldersByName(folderName);
     const folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
@@ -759,18 +729,12 @@ function generatePDFLaporan(dbId, idTrx) {
   }
 }
 
-// --- TAMBAHAN FUNGSI BARU UNTUK SAVE BANYAK ---
 function saveBulkMasterData(dbId, sheetName, data2D) {
   try {
     const ss = SpreadsheetApp.openById(dbId);
     const sheet = ensureSheetExists(ss, sheetName);
-    
-    // Cek apakah data kosong
     if (!data2D || data2D.length === 0) return "Tidak ada data yang disimpan.";
-    
-    // Simpan banyak baris sekaligus menggunakan setValues
     sheet.getRange(sheet.getLastRow() + 1, 1, data2D.length, data2D[0].length).setValues(data2D);
-    
     return "Berhasil menambahkan " + data2D.length + " data Guru!";
   } catch (e) { return "Error: " + e.toString(); }
 }
