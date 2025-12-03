@@ -20,7 +20,8 @@ function ensureSheetExists(ss, sheetName) {
     sheet = ss.insertSheet(sheetName);
     // Header Default untuk Sheet Baru
     if (sheetName === "Data_Toko") {
-      sheet.appendRow(["Nama Toko", "Jenis Toko", "Alamat Toko", "No. Telp", "Pemilik", "Tanggal TTD"]);
+      // GANTI HEADER "Tanggal TTD" MENJADI "Tempat TTD"
+      sheet.appendRow(["Nama Toko", "Jenis Toko", "Alamat Toko", "No. Telp", "Pemilik", "Tempat TTD"]);
     } else if (sheetName === "Data_Uraian") {
       sheet.appendRow(["Kode Rekening", "Nama Uraian Belanja"]);
     } else if (sheetName === "Data_Tukang") {
