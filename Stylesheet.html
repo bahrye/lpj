@@ -68,4 +68,43 @@
         width: 100px;
         text-align: center;
     }
+
+    /* --- GAYA KHUSUS DATA MASTER --- */
+    
+    /* Container agar tabel bisa di-scroll vertikal */
+    .master-table-scroll {
+        max-height: 480px;       /* Tinggi maksimal tabel sebelum muncul scroll */
+        overflow-y: auto;        /* Munculkan scrollbar vertikal */
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        box-shadow: inset 0 0 10px rgba(0,0,0,0.05); /* Efek kedalaman */
+        background-color: #fff;
+    }
+
+    /* Agar Header Tabel Tetap Diam (Sticky) saat discroll */
+    .master-table-scroll thead th {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* Bayangan pemisah header */
+        border-top: none;
+    }
+
+    /* Gaya Form Toko yang lebih modern */
+    .form-header-modern {
+        background: linear-gradient(45deg, #0d6efd, #0dcaf0);
+        color: white;
+        padding: 15px;
+        border-radius: 8px 8px 0 0;
+        font-weight: bold;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .form-card-modern {
+        border: none;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        border-radius: 8px;
+    }
 </style>
