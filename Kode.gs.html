@@ -24,6 +24,8 @@ function ensureSheetExists(ss, sheetName) {
       sheet.appendRow(["Kode Rekening", "Nama Uraian Belanja"]);
     } else if (sheetName === "Data_Tukang") {
       sheet.appendRow(["Nama Tukang", "Alamat Tukang"]);
+    } else if (sheetName === "Data_Nomor_Surat") {
+      sheet.appendRow(["ID_TRX", "No_Keluar", "No_Masuk", "No_Periksa", "No_Terima", "No_Bayar"]);
     }
     sheet.getRange(1, 1, 1, sheet.getLastColumn()).setFontWeight("bold");
   }
@@ -63,6 +65,7 @@ function loginUser(form) {
 function getDataSekolah(dbId) {
   try {
     const ss = SpreadsheetApp.openById(dbId).getSheetByName("Data_Sekolah");
+    if(!ss) return {};
     const data = ss.getDataRange().getValues();
     let result = {};
     data.forEach(row => { if(row[0]) result[row[0]] = row[1]; });
@@ -70,33 +73,30 @@ function getDataSekolah(dbId) {
   } catch(e) { return {}; }
 }
 
-// UPDATE: Fungsi save agar tidak menimpa (overwrite) data lain seperti id_kop_surat
+// UPDATE: Menyimpan data sekolah tanpa menimpa key lain (seperti id_kop_surat)
 function saveDataSekolah(dbId, formObj) {
   const ss = SpreadsheetApp.openById(dbId).getSheetByName("Data_Sekolah");
   
-  // 1. Baca data lama dulu agar key lain (misal: id_kop_surat) tidak hilang
+  // 1. Baca data lama agar key lain tidak hilang
   const existingData = ss.getDataRange().getValues();
   let dataMap = {};
   existingData.forEach(row => {
     if(row[0]) dataMap[row[0]] = row[1];
   });
   
-  // 2. Update dengan data baru dari form
+  // 2. Update dengan data baru
   Object.keys(formObj).forEach(key => {
     dataMap[key] = formObj[key];
   });
   
-  // 3. Tulis ulang ke sheet
+  // 3. Tulis ulang
   const finalData = Object.entries(dataMap);
-  ss.clear(); // Bersihkan sheet
-  if(finalData.length > 0) {
-    ss.getRange(1, 1, finalData.length, 2).setValues(finalData);
-  }
-  
+  ss.clear(); 
+  if(finalData.length > 0) ss.getRange(1, 1, finalData.length, 2).setValues(finalData);
   return "Data Sekolah Berhasil Disimpan!";
 }
 
-// Helper khusus untuk update satu key saja di Data_Sekolah
+// Fungsi helper untuk update satu key spesifik di Data_Sekolah
 function updateDataSekolahKey(dbId, key, value) {
   const ss = SpreadsheetApp.openById(dbId).getSheetByName("Data_Sekolah");
   const data = ss.getDataRange().getValues();
@@ -104,7 +104,6 @@ function updateDataSekolahKey(dbId, key, value) {
   let dataMap = {};
   data.forEach(row => { if(row[0]) dataMap[row[0]] = row[1]; });
   
-  // Update/Insert key target
   dataMap[key] = value;
   
   const finalData = Object.entries(dataMap);
@@ -167,13 +166,12 @@ function getDropdownData(dbId) {
     const ss = SpreadsheetApp.openById(dbId);
     const sToko = ensureSheetExists(ss, "Data_Toko");
     const sUraian = ensureSheetExists(ss, "Data_Uraian");
-    const sTukang = ensureSheetExists(ss, "Data_Tukang"); // UPDATE: Ambil sheet Tukang
+    const sTukang = ensureSheetExists(ss, "Data_Tukang");
 
     const dataToko = sToko.getLastRow() > 1 ? sToko.getRange(2, 1, sToko.getLastRow()-1, 1).getValues().flat() : [];
     const dataUraian = sUraian.getLastRow() > 1 ? sUraian.getRange(2, 2, sUraian.getLastRow()-1, 1).getValues().flat() : [];
-    const dataTukang = sTukang.getLastRow() > 1 ? sTukang.getRange(2, 1, sTukang.getLastRow()-1, 1).getValues().flat() : []; // UPDATE: Ambil data Tukang
+    const dataTukang = sTukang.getLastRow() > 1 ? sTukang.getRange(2, 1, sTukang.getLastRow()-1, 1).getValues().flat() : [];
 
-    // UPDATE: Return dataTukang juga
     return { toko: dataToko, uraian: dataUraian, tukang: dataTukang }; 
   } catch (e) { return { toko: [], uraian: [], tukang: [] }; }
 }
@@ -192,7 +190,6 @@ function processTransaksiLengkap(dbId, header, items) {
 function getDashboardStats(dbId) {
   const ss = SpreadsheetApp.openById(dbId);
   
-  // 1. Ambil Total Anggaran dari Data_Sekolah
   let totalAnggaran = 0;
   try {
     const sSekolah = ss.getSheetByName("Data_Sekolah");
@@ -203,31 +200,22 @@ function getDashboardStats(dbId) {
     }
   } catch(e) {}
 
-  // 2. Hitung Transaksi
   const sTrx = ss.getSheetByName("Transaksi");
-  const lr = sTrx.getLastRow();
-  
   let totalBelanja = 0;
   let uniqueIds = new Set(); 
   
-  if (lr > 1) {
-    const values = sTrx.getRange(2, 1, lr - 1, 9).getValues(); 
-    
+  if (sTrx && sTrx.getLastRow() > 1) {
+    const values = sTrx.getRange(2, 1, sTrx.getLastRow() - 1, 9).getValues(); 
     values.forEach(v => {
-      const id = v[0];     
-      const total = Number(v[8] || 0); 
-      
-      if(id) uniqueIds.add(id); 
-      totalBelanja += total;
+      if(v[0]) uniqueIds.add(v[0]); 
+      totalBelanja += Number(v[8] || 0);
     });
   }
   
-  const sisa = totalAnggaran - totalBelanja;
-
   return {
     anggaran: totalAnggaran,
     belanja: totalBelanja,
-    sisa: sisa,
+    sisa: totalAnggaran - totalBelanja,
     count: uniqueIds.size 
   };
 }
@@ -239,7 +227,6 @@ function getRiwayatTransaksiGrouped(dbId) {
     if (lr <= 1) return [];
 
     const data = ss.getRange(2, 1, lr - 1, 10).getValues(); 
-    
     let grouped = {};
     
     for(let i = data.length - 1; i >= 0; i--) {
@@ -270,30 +257,22 @@ function getRiwayatTransaksiGrouped(dbId) {
             harga: row[7],
             total: row[8]
         });
-        
         grouped[id].total_trx += Number(row[8] || 0);
     }
     return Object.values(grouped);
-  } catch (e) {
-    return [];
-  }
+  } catch (e) { return []; }
 }
 
 function deleteTransaksiById(dbId, idTrx) {
     const ss = SpreadsheetApp.openById(dbId).getSheetByName("Transaksi");
     const data = ss.getDataRange().getValues();
-    let deletedCount = 0;
-    
     for (let i = data.length - 1; i >= 1; i--) {
-        if (data[i][0] == idTrx) {
-            ss.deleteRow(i + 1);
-            deletedCount++;
-        }
+        if (data[i][0] == idTrx) ss.deleteRow(i + 1);
     }
     return "Berhasil menghapus transaksi.";
 }
 
-// --- FITUR PENGATURAN CETAK ---
+// --- FITUR PENGATURAN CETAK (BARU) ---
 
 // 1. Upload Kop Surat (Simpan ID File ke Data_Sekolah)
 function saveKopSuratToDrive(dbId, base64Data, mimeType, sekolahName) {
@@ -301,16 +280,14 @@ function saveKopSuratToDrive(dbId, base64Data, mimeType, sekolahName) {
     const folderName = "LPJ_Attachments";
     const fileName = "KopSurat_" + sekolahName + "_" + new Date().getTime();
     
-    // Cari/Buat Folder
     const folders = DriveApp.getFoldersByName(folderName);
     let folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
     
-    // Decode & Save File
     const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), mimeType, fileName);
     const file = folder.createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     
-    // PERBAIKAN: Simpan ID File ke Sheet Data_Sekolah
+    // SIMPAN ID KE DATA_SEKOLAH
     updateDataSekolahKey(dbId, "id_kop_surat", file.getId());
     
     return { status: "success", url: "https://drive.google.com/uc?export=view&id=" + file.getId() };
@@ -319,14 +296,15 @@ function saveKopSuratToDrive(dbId, base64Data, mimeType, sekolahName) {
   }
 }
 
+// Ambil URL Kop Surat dari Sheet Data_Sekolah
 function getKopSuratUrl(dbId) {
   try {
     const ss = SpreadsheetApp.openById(dbId).getSheetByName("Data_Sekolah");
+    if (!ss) return null;
     const data = ss.getDataRange().getValues();
     
-    // Cari baris dengan key "id_kop_surat"
     const row = data.find(r => r[0] === "id_kop_surat");
-    const fileId = row ? row[1] : null; // Ambil kolom kedua (Value)
+    const fileId = row ? row[1] : null; 
     
     if (fileId) {
       return "https://drive.google.com/uc?export=view&id=" + fileId;
@@ -336,9 +314,6 @@ function getKopSuratUrl(dbId) {
 }
 
 // 2. Data Nomor Surat
-// Kita akan menggunakan Sheet baru bernama "Data_Nomor_Surat"
-// Kolom: [ID_TRX, No_Keluar, No_Masuk, No_Periksa, No_Terima, No_Bayar]
-
 function getNomorSuratData(dbId) {
   try {
     const ss = SpreadsheetApp.openById(dbId);
@@ -346,12 +321,11 @@ function getNomorSuratData(dbId) {
     
     // Jika header belum ada
     if (sheet.getLastRow() === 0) {
-      sheet.appendRow(["ID_TRX", "No_Keluar", "No_Masuk", "No_Periksa", "No_Terima", "No_Bayar"]);
+        sheet.appendRow(["ID_TRX", "No_Keluar", "No_Masuk", "No_Periksa", "No_Terima", "No_Bayar"]);
     }
     
     const data = sheet.getDataRange().getValues();
     let map = {};
-    // Skip header
     for(let i=1; i<data.length; i++) {
       map[data[i][0]] = {
         keluar: data[i][1],
@@ -372,10 +346,9 @@ function saveNomorSuratData(dbId, formData) {
     const data = sheet.getDataRange().getValues();
     
     let rowIndex = -1;
-    // Cek apakah ID_TRX sudah ada
     for(let i=1; i<data.length; i++) {
       if(data[i][0] == formData.id_trx) {
-        rowIndex = i + 1; // +1 karena array 0-based, row 1-based
+        rowIndex = i + 1; 
         break;
       }
     }
@@ -390,15 +363,11 @@ function saveNomorSuratData(dbId, formData) {
     ];
     
     if (rowIndex > 0) {
-      // Update
       sheet.getRange(rowIndex, 1, 1, 6).setValues([rowData]);
     } else {
-      // Insert Baru
       sheet.appendRow(rowData);
     }
     
     return "Nomor Surat Berhasil Disimpan!";
-  } catch (e) {
-    return "Error: " + e.toString();
-  }
+  } catch (e) { return "Error: " + e.toString(); }
 }
