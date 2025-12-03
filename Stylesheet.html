@@ -1,11 +1,54 @@
 <style>
     body { overflow-x: hidden; }
     .hidden { display: none !important; }
+    
+    /* Loader */
     .loading-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); z-index:9999; display:none; justify-content:center; align-items:center; flex-direction: column;}
+    
+    /* Sidebar */
     #sidebar-wrapper { min-height: 100vh; margin-left: -15rem; transition: margin .25s ease-out; }
     #sidebar-wrapper .sidebar-heading { padding: 0.875rem 1.25rem; font-size: 1.2rem; }
     #wrapper.toggled #sidebar-wrapper { margin-left: 0; }
     #page-content-wrapper { width: 100%; }
+    
     .sidebar-btn { text-align: left; padding: 10px 15px; border: none; background: transparent; color: #ccc; width: 100%; }
     .sidebar-btn:hover, .sidebar-btn.active { background: rgba(255,255,255,0.1); color: #fff; text-decoration: none; }
+
+    /* --- GAYA TABEL BARU --- */
+    
+    .table td, .table th {
+        vertical-align: middle;
+        white-space: nowrap; /* Mencegah teks turun ke bawah */
+    }
+
+    /* KUNCI PERBAIKAN: Scroll Dalam Cell */
+    .detail-scroll {
+        max-width: 350px;       /* Batas lebar kotak barang */
+        overflow-x: auto;       /* Munculkan scrollbar jika teks panjang */
+        white-space: nowrap;    /* Teks satu baris */
+        padding-bottom: 5px;    /* Jarak sedikit untuk scrollbar */
+        scrollbar-width: thin;  /* Scrollbar tipis (Firefox) */
+    }
+
+    /* Mempercantik Scrollbar (Chrome/Edge/Safari) */
+    .detail-scroll::-webkit-scrollbar {
+        height: 6px; /* Tinggi scrollbar horizontal */
+    }
+    .detail-scroll::-webkit-scrollbar-track {
+        background: #f1f1f1; 
+        border-radius: 3px;
+    }
+    .detail-scroll::-webkit-scrollbar-thumb {
+        background: #ccc; 
+        border-radius: 3px;
+    }
+    .detail-scroll::-webkit-scrollbar-thumb:hover {
+        background: #999; 
+    }
+
+    /* Agar tombol aksi posisinya pas */
+    .col-aksi {
+        width: 100px;
+        text-align: center;
+    }
 </style>
