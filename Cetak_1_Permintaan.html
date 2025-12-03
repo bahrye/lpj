@@ -3,45 +3,79 @@
       <? if (sekolah.kop_base64) { ?>
         <img src="<?= sekolah.kop_base64 ?>" class="kop-img">
       <? } else { ?>
-        <h2 style="margin:0"><?= sekolah.sekolah ?></h2>
+        <h2 style="margin:0; text-transform:uppercase;"><?= sekolah.sekolah ?></h2>
         <p style="margin:0"><?= sekolah.alamat ?></p>
       <? } ?>
     </div>
     <div class="garis-kop"></div>
 
-    <table class="meta-table">
-      <tr><td width="60">Nomor</td><td width="10">:</td><td><?= nomor.keluar || "......................." ?></td></tr>
-      <tr><td>Hal</td><td>:</td><td class="text-bold"><?= trx.uraian ?></td></tr>
-      <tr><td>Lamp</td><td>:</td><td>-</td></tr>
+    <table style="width: 100%; border-collapse: collapse; vertical-align: top;">
+        <tr>
+          <td width="80">Nomor</td>
+          <td width="10">:</td>
+          <td><?= nomor.keluar || "......................." ?></td>
+        </tr>
+        <tr>
+          <td>Hal</td>
+          <td>:</td>
+          <td style="font-weight: bold;"><?= trx.uraian ?></td>
+        </tr>
+        <tr>
+          <td>Lamp</td>
+          <td>:</td>
+          <td>-</td>
+        </tr>
     </table>
 
-    <div class="tujuan-surat">
-      Kepada Yth. Pimp <b><?= trx.toko ?></b><br>Di<br>
-      <div style="margin-top: 2px;"><?= toko.alamat ?></div>
+    <div style="margin-top: 20px; margin-left: 45%; width: 55%;">
+        Kepada Yth. Pimp <b><?= trx.toko ?></b><br>
+        Di -<br>
+        <div style="padding-left: 10px;">
+           <?= toko.alamat ?>
+        </div>
     </div>
 
-    <p>Assalamualaikum Wr. Wb.</p>
-    <p class="text-justify">
-      Sehubungan dengan adanya kegiatan <b><?= trx.uraian ?></b> di <b><?= sekolah.sekolah ?></b>, 
+    <p style="margin-top: 20px;">Assalamualaikum Wr. Wb.</p>
+    
+    <p class="text-justify" style="line-height: 1.5;">
+      Sehubungan dengan adanya kegiatan <b><?= trx.uraian ?></b> pada <?= sekolah.sekolah ?>, 
       dengan ini kami memohon kiranya berkenan untuk menyediakan daftar barang dibawah pada tanggal 
-      <b><?= fmtDate(tanggal.periksa || trx.tanggal) ?></b> dengan perincian sebagai berikut:
+      <?= fmtDate(tanggal.periksa || trx.tanggal) ?> dengan perincian sebagai berikut:
     </p>
 
-    <table class="table-request">
+    <table class="table-request" style="margin-top: 10px; border: 1px solid black; width: 100%;">
       <thead>
-        <tr><th width="5%">No</th><th>JENIS BARANG</th><th width="15%">BANYAKNYA</th><th width="15%">SATUAN</th></tr>
+        <tr style="height: 30px; background-color: #fff;">
+          <th width="5%" style="border: 1px solid black; text-align: center;">NO</th>
+          <th style="border: 1px solid black; text-align: center;">JENIS BARANG</th>
+          <th width="15%" style="border: 1px solid black; text-align: center;">BANYAKNYA</th>
+          <th width="15%" style="border: 1px solid black; text-align: center;">SATUAN</th>
+        </tr>
       </thead>
       <tbody>
         <? for(var i=0; i<items.length; i++) { ?>
         <tr>
-          <td class="text-center"><?= i+1 ?></td>
-          <td><?= items[i].nama ?></td>
-          <td class="text-center"><?= items[i].vol ?></td>
-          <td class="text-center"><?= items[i].sat ?></td>
+          <td class="text-center" style="border: 1px solid black; padding: 5px;"><?= i+1 ?></td>
+          <td style="border: 1px solid black; padding: 5px;"><?= items[i].nama ?></td>
+          <td class="text-center" style="border: 1px solid black; padding: 5px;"><?= items[i].vol ?></td>
+          <td class="text-center" style="border: 1px solid black; padding: 5px;"><?= items[i].sat ?></td>
         </tr>
         <? } ?>
-        <? for(var j=items.length; j<15; j++) { ?>
-        <tr><td class="text-center">&nbsp;</td><td></td><td></td><td></td></tr>
+        
+        <? 
+           var minRows = 8; 
+           var dataCount = items.length;
+           var emptyRowsNeeded = minRows - dataCount;
+           if (emptyRowsNeeded < 0) emptyRowsNeeded = 0; // Jika data lebih dari 8, tidak perlu baris kosong
+        ?>
+        
+        <? for(var j=0; j<emptyRowsNeeded; j++) { ?>
+        <tr>
+          <td class="text-center" style="border: 1px solid black; height: 22px;">&nbsp;</td>
+          <td style="border: 1px solid black;"></td>
+          <td style="border: 1px solid black;"></td>
+          <td style="border: 1px solid black;"></td>
+        </tr>
         <? } ?>
       </tbody>
     </table>
@@ -50,7 +84,8 @@
     
     <div class="ttd-wrapper">
       <div class="ttd-box">
-        <?= sekolah.kota ?>, <?= fmtDate(nomor.tgl_surat_keluar || trx.tanggal) ?><br>Hormat Kami,<br>
+        <?= sekolah.kota ?>, <?= fmtDate(nomor.tgl_surat_keluar || trx.tanggal) ?><br>
+        Hormat Kami,<br>
         <div class="ttd-space"></div>
         <b class="text-underline"><?= sekolah.bendahara ?></b>
       </div>
