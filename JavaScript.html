@@ -261,15 +261,28 @@
     function cR(e) { const r = e.closest('tr'); const v = r.querySelector('.i-vol').value || 0; const h = r.querySelector('.i-harga').value || 0; const total = v * h; r.querySelector('.i-total').value = formatRupiah(total); r.querySelector('.i-total').setAttribute('data-value', total); cGT(); }
     function cGT() { let t = 0; document.querySelectorAll('.i-total').forEach(e => { t += Number(e.getAttribute('data-value') || 0); }); document.getElementById('grandTotal').innerText = formatRupiah(t); }
     
-    // --- SIMPAN / UPDATE TRANSAKSI ---
     function simpanTransaksi(e) { 
         e.preventDefault(); const f = e.target;
-        const h = { tanggal: f.tanggal.value, toko: f.toko.value, uraian: f.uraian.value, no_bukti: f.no_bukti.value };
+        
+        // PERUBAHAN DI SINI: no_bukti diisi string kosong "" karena formnya sudah dihapus
+        const h = { 
+            tanggal: f.tanggal.value, 
+            toko: f.toko.value, 
+            uraian: f.uraian.value, 
+            no_bukti: "" 
+        };
+
         const it = []; 
-        const idEdit = document.getElementById('trxIdEdit').value; // Ambil ID jika sedang edit
+        const idEdit = document.getElementById('trxIdEdit').value; 
 
         document.querySelectorAll('#trxBody tr').forEach(r => { 
-            it.push({ nama: r.querySelector('.i-nama').value, vol: r.querySelector('.i-vol').value, sat: r.querySelector('.i-sat').value, harga: r.querySelector('.i-harga').value, total: r.querySelector('.i-total').getAttribute('data-value') || 0 });
+            it.push({ 
+                nama: r.querySelector('.i-nama').value, 
+                vol: r.querySelector('.i-vol').value, 
+                sat: r.querySelector('.i-sat').value, 
+                harga: r.querySelector('.i-harga').value, 
+                total: r.querySelector('.i-total').getAttribute('data-value') || 0 
+            });
         }); 
         
         if (it.length === 0) return showAlert("Belum ada barang yang diinput!", "warning"); 
@@ -277,7 +290,7 @@
         
         google.script.run.withSuccessHandler(r => { 
             loader(false); showAlert(r, 'success'); 
-            cancelEditMode(); // Reset form & tombol
+            cancelEditMode(); 
             loadRiwayat(); loadStats(); 
         }).processTransaksiLengkap(DB_ID, h, it, idEdit); 
     }
@@ -315,19 +328,50 @@
             // 1. Scroll ke Form
             document.getElementById('view-transaksi').scrollIntoView({behavior: 'smooth'});
 
-            // 2. Set Mode Edit (Tanpa hapus data DB)
+            // 2. Set Mode Edit
             document.getElementById('trxIdEdit').value = trx.id;
             document.getElementById('btnSimpanTrx').innerText = "UPDATE"; 
             document.getElementById('btnSimpanTrx').classList.replace('btn-primary', 'btn-warning');
             document.getElementById('btnBatalEdit').classList.remove('hidden');
             document.getElementById('titleTrx').innerText = "Edit Transaksi: " + trx.id;
 
-            // 3. Isi Header
-            if (CACHE_DROPDOWNS.tukang && CACHE_DROPDOWNS.tukang.includes(trx.toko)) switchTrxMode('tukang'); else switchTrxMode('belanja');
+            // 3. Isi Header & Logika Cerdas Pihak (Toko/Tukang)
+            const namaPihak = trx.toko; 
+            
+            // Cek apakah nama ini ada di list Tukang
+            let isTukang = false;
+            if (CACHE_DROPDOWNS.tukang && CACHE_DROPDOWNS.tukang.includes(namaPihak)) {
+                isTukang = true;
+            }
+
+            // Ganti Tab
+            if (isTukang) { switchTrxMode('tukang'); } else { switchTrxMode('belanja'); }
+
+            // Pastikan opsi ada di dropdown (Fix Bug Pihak Kosong)
+            const selectPihak = document.getElementById('trxPihak');
+            let opsiDitemukan = false;
+            for(let i = 0; i < selectPihak.options.length; i++) {
+                if (selectPihak.options[i].value === namaPihak) { opsiDitemukan = true; break; }
+            }
+            if (!opsiDitemukan && namaPihak) {
+                selectPihak.add(new Option(namaPihak, namaPihak));
+            }
+            selectPihak.value = namaPihak;
+
+            // Isi Tanggal
             document.getElementById('trxTanggal').value = trx.tanggal;
-            document.getElementById('trxPihak').value = trx.toko; 
-            document.getElementById('trxUraian').value = trx.uraian;
-            document.getElementById('trxBukti').value = trx.no_bukti;
+            
+            // Isi Uraian (dengan pengaman jika data master uraian terhapus)
+            const selectUraian = document.getElementById('trxUraian');
+            let uraianAda = false;
+             for(let i = 0; i < selectUraian.options.length; i++) {
+                if (selectUraian.options[i].value === trx.uraian) { uraianAda = true; break; }
+            }
+            if (!uraianAda && trx.uraian) { selectUraian.add(new Option(trx.uraian, trx.uraian)); }
+            selectUraian.value = trx.uraian;
+
+            // --- BAGIAN NO BUKTI DIHAPUS DI SINI ---
+            // (Baris pengisian trxBukti sudah dibuang agar tidak error)
 
             // 4. Isi Body (Barang)
             const tbody = document.getElementById('trxBody'); tbody.innerHTML = ''; 
@@ -349,7 +393,10 @@
         document.getElementById('btnSimpanTrx').innerText = "SIMPAN";
         document.getElementById('btnSimpanTrx').classList.replace('btn-warning', 'btn-primary');
         document.getElementById('btnBatalEdit').classList.add('hidden');
-        document.getElementById('titleTrx').innerText = "Input Transaksi Belanja"; // Kembalikan judul
+        document.getElementById('titleTrx').innerText = "Input Transaksi Belanja"; 
+        
+        // Hapus baris reset trxBukti jika ada, atau biarkan formTrx.reset() yang menanganinya (aman).
+        
         switchTrxMode('belanja'); addRow(); 
     }
 
