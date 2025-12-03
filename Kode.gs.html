@@ -89,25 +89,21 @@ function getAllMasterData(dbId, sheetName) {
     let data = sheet.getRange(2, 1, lr - 1, sheet.getLastColumn()).getValues();
     
     // --- PERBAIKAN: KONVERSI TANGGAL ---
-    // Loop setiap baris dan cell untuk cek apakah ada data Tanggal
-    // Jika ada, ubah jadi String ISO (yyyy-mm-dd) agar aman dikirim
     data = data.map(row => {
       return row.map(cell => {
         if (Object.prototype.toString.call(cell) === '[object Date]') {
           try {
-            return cell.toISOString().split('T')[0]; // Mengambil bagian tanggal saja
+            return cell.toISOString().split('T')[0];
           } catch (e) {
-            return ""; // Jika error tanggal, kembalikan kosong
+            return ""; 
           }
         }
         return cell;
       });
     });
-    // ------------------------------------
 
     return data; 
   } catch (e) { 
-    // Log error jika perlu: console.log(e);
     return []; 
   }
 }
@@ -167,4 +163,37 @@ function getDashboardStats(dbId) {
   let totalBelanja = 0;
   values.forEach(v => totalBelanja += Number(v[0] || 0));
   return { total: totalBelanja, count: lr-1 };
+}
+
+// --- FUNGSI BARU: AMBIL RIWAYAT TRANSAKSI ---
+function getRiwayatTransaksi(dbId) {
+  try {
+    const ss = SpreadsheetApp.openById(dbId).getSheetByName("Transaksi");
+    const lr = ss.getLastRow();
+    
+    if (lr <= 1) return [];
+    
+    // Ambil 50 baris terakhir saja
+    const startRow = Math.max(2, lr - 49);
+    const numRows = lr - startRow + 1;
+    
+    const data = ss.getRange(startRow, 1, numRows, 9).getValues();
+    
+    // Reverse agar yang terbaru di atas & format tanggal
+    return data.reverse().map(row => {
+      let tgl = "";
+      if (row[1] && typeof row[1].getMonth === 'function') {
+        tgl = Utilities.formatDate(row[1], Session.getScriptTimeZone(), "dd/MM/yyyy");
+      }
+      return {
+        tanggal: tgl,
+        uraian: row[2],
+        toko: row[3],
+        barang: row[4],
+        total: row[8]
+      };
+    });
+  } catch (e) {
+    return [];
+  }
 }
