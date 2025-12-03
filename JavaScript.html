@@ -8,15 +8,11 @@
     let CACHE_DROPDOWNS = { toko: [], uraian: [], tukang: [] };
     let TRX_MODE = 'belanja'; 
 
-    let CACHE_DATA = { 
-        Data_Uraian: [], 
-        Data_Toko: [], 
-        Data_Tukang: [], 
-        Riwayat: [] 
-    };
+    let CACHE_DATA = { Data_Uraian: [], Data_Toko: [], Data_Tukang: [], Riwayat: [] };
+    let CACHE_NOMOR_SURAT = {}; 
+    let CACHE_TANGGAL_SURAT = {}; 
     
-    let CACHE_NOMOR_SURAT = {}; // Cache baru untuk nomor surat
-    let CACHE_TANGGAL_SURAT = {}; // Cache baru untuk tanggal surat
+    let confirmCallback = null; // Untuk Modal Konfirmasi
 
     if (DB_ID) { 
         initDashboard(); 
@@ -25,7 +21,7 @@
     }
 
     // ==========================================
-    // 2. UTILITY FUNCTIONS
+    // 2. UTILITY & HELPER FUNCTIONS
     // ==========================================
     
     function loader(show) { 
@@ -42,9 +38,41 @@
 
     function toggleSidebar() {
         document.getElementById('wrapper').classList.toggle('toggled');
-        const sidebar = document.getElementById('sidebar-wrapper');
-        sidebar.style.marginLeft = document.getElementById('wrapper').classList.contains('toggled') ? "0" : "-15rem";
+        document.getElementById('sidebar-wrapper').style.marginLeft = document.getElementById('wrapper').classList.contains('toggled') ? "0" : "-15rem";
     }
+
+    // --- FUNGSI ALERT BARU ---
+    function showAlert(message, type = 'success') {
+        const container = document.getElementById('alertContainer');
+        const alertDiv = document.createElement('div');
+        
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show shadow-sm`;
+        alertDiv.role = 'alert';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        
+        container.appendChild(alertDiv);
+        setTimeout(() => {
+            if (document.body.contains(alertDiv)) {
+                const bsAlert = new bootstrap.Alert(alertDiv);
+                bsAlert.close();
+            }
+        }, 3000);
+    }
+
+    // --- FUNGSI KONFIRMASI MODAL ---
+    function showConfirm(text, callback) {
+        document.getElementById('txtKonfirmasi').innerText = text;
+        confirmCallback = callback;
+        new bootstrap.Modal(document.getElementById('modalKonfirmasi')).show();
+    }
+    
+    document.getElementById('btnYaKonfirmasi').addEventListener('click', function() {
+        if (confirmCallback) confirmCallback();
+        bootstrap.Modal.getInstance(document.getElementById('modalKonfirmasi')).hide();
+    });
 
     // ==========================================
     // 3. AUTHENTICATION
@@ -61,11 +89,10 @@
         e.preventDefault(); 
         loader(true); 
         const formData = Object.fromEntries(new FormData(e.target));
-        
         google.script.run.withSuccessHandler(res => { 
             loader(false); 
-            alert(res.message); 
-            if(res.status === 'success') switchAuth('login'); 
+            if(res.status === 'success') { showAlert(res.message, 'success'); switchAuth('login'); } 
+            else { showAlert(res.message, 'danger'); }
         }).registerUser(formData); 
     }
 
@@ -73,7 +100,6 @@
         e.preventDefault(); 
         loader(true); 
         const formData = Object.fromEntries(new FormData(e.target));
-        
         google.script.run.withSuccessHandler(res => { 
             loader(false); 
             if (res.status === 'success') { 
@@ -82,24 +108,21 @@
                 localStorage.setItem('bos_db_id', DB_ID); 
                 localStorage.setItem('bos_sekolah_nama', SEKOLAH_NAMA); 
                 initDashboard(); 
-            } else { 
-                alert(res.message); 
-            } 
+            } else { showAlert(res.message, 'danger'); } 
         }).loginUser(formData); 
     }
 
-    function logout() { 
-        if (confirm('Keluar dari aplikasi?')) { 
+    function confirmLogout() { 
+        showConfirm('Apakah Anda yakin ingin keluar dari aplikasi?', function() {
             localStorage.clear(); 
             location.reload(); 
-        } 
+        });
     }
 
     function initDashboard() { 
         document.getElementById('authContainer').classList.add('hidden'); 
         document.getElementById('wrapper').classList.remove('hidden'); 
         document.getElementById('displaySekolah').innerText = SEKOLAH_NAMA; 
-        
         toggleSidebar(); 
         openView('dashboard'); 
     }
@@ -112,23 +135,18 @@
         document.querySelectorAll('.app-view').forEach(el => el.classList.add('hidden'));
         document.getElementById('view-' + viewName).classList.remove('hidden');
 
+        // Reset mode edit jika user pindah halaman dari transaksi
+        if (viewName !== 'transaksi') cancelEditMode(); 
+
         if (viewName === 'sekolah') loadSekolahData();
         if (viewName === 'dashboard') loadStats();
-        if (viewName === 'transaksi') { 
-            loadDropdowns(); 
-            loadRiwayat(); 
-        }
+        if (viewName === 'transaksi') { loadDropdowns(); loadRiwayat(); }
         if (viewName === 'master') loadMasterTable('Data_Uraian');
-        
-        // VIEW BARU
-        if (viewName === 'pengaturan') {
-            loadExistingKop();
-            // Default tab
-        }
+        if (viewName === 'pengaturan') loadExistingKop();
     }
 
     // ==========================================
-    // 5. DASHBOARD LOGIC
+    // 5. DASHBOARD & SEKOLAH
     // ==========================================
     
     function loadStats() { 
@@ -137,236 +155,143 @@
             document.getElementById('dashBelanja').innerText = formatRupiah(res.belanja);
             document.getElementById('dashSisa').innerText = formatRupiah(res.sisa);
             document.getElementById('dashCount').innerText = res.count; 
-            
             const cardSisa = document.getElementById('cardSisa');
-            if (res.sisa < 0) {
-                cardSisa.classList.replace('bg-success', 'bg-danger'); 
-            } else {
-                cardSisa.classList.replace('bg-danger', 'bg-success');
-            }
+            if (res.sisa < 0) cardSisa.classList.replace('bg-success', 'bg-danger'); 
+            else cardSisa.classList.replace('bg-danger', 'bg-success');
         }).getDashboardStats(DB_ID); 
     }
 
-    // ==========================================
-    // 6. DATA SEKOLAH LOGIC
-    // ==========================================
-    
     function loadSekolahData() { 
         google.script.run.withSuccessHandler(data => { 
             const f = document.getElementById('formSekolah'); 
-            for (const [key, value] of Object.entries(data)) {
-                if (f.elements[key]) f.elements[key].value = value;
-            }
+            for (const [key, value] of Object.entries(data)) { if (f.elements[key]) f.elements[key].value = value; }
         }).getDataSekolah(DB_ID); 
     }
 
     function simpanSekolah(e) { 
-        e.preventDefault(); 
-        loader(true); 
-        const formData = Object.fromEntries(new FormData(e.target));
-        google.script.run.withSuccessHandler(res => { 
-            loader(false); 
-            alert(res); 
-        }).saveDataSekolah(DB_ID, formData); 
+        e.preventDefault(); loader(true); 
+        google.script.run.withSuccessHandler(res => { loader(false); showAlert(res, 'success'); }).saveDataSekolah(DB_ID, Object.fromEntries(new FormData(e.target))); 
     }
 
     // ==========================================
-    // 7. MASTER DATA LOGIC
+    // 6. MASTER DATA
     // ==========================================
 
     function loadMasterTable(type) {
         const tbody = document.getElementById('tbody_' + type);
         tbody.innerHTML = '<tr><td colspan="4" class="text-center">Memuat data...</td></tr>';
-        
         google.script.run.withSuccessHandler(data => {
-            CACHE_DATA[type] = data; 
-            tbody.innerHTML = '';
-            
-            if (!data || data.length === 0) { 
-                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Belum ada data</td></tr>'; 
-                return; 
-            }
-            
+            CACHE_DATA[type] = data; tbody.innerHTML = '';
+            if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Belum ada data</td></tr>'; return; }
             data.forEach((row, index) => {
                 let html = '';
                 const btns = `<td><button class="btn btn-warning btn-sm py-0 px-1" onclick="editMaster('${type}', ${index})"><i class="fas fa-edit"></i></button> <button class="btn btn-danger btn-sm py-0 px-1" onclick="deleteMaster('${type}', ${index})"><i class="fas fa-trash"></i></button></td>`;
-                
                 if (type === 'Data_Uraian') html = `<td>${row[0]||''}</td><td>${row[1]||''}</td>${btns}`;
                 else if (type === 'Data_Toko') html = `<td><b>${row[0]||'-'}</b><br><small class="text-muted">${row[1]||''}</small></td><td>${row[2]||'-'}<br><small class="text-muted">${row[3]||''}</small></td><td>${row[4]||'-'}</td>${btns}`;
                 else if (type === 'Data_Tukang') html = `<td>${row[0]||''}</td><td>${row[1]||''}</td>${btns}`;
-                
-                const tr = document.createElement('tr'); 
-                tr.innerHTML = html; 
-                tbody.appendChild(tr);
+                const tr = document.createElement('tr'); tr.innerHTML = html; tbody.appendChild(tr);
             });
         }).getAllMasterData(DB_ID, type);
     }
 
     function simpanMaster(e, type) { 
-        e.preventDefault(); 
-        loader(true); 
-        const f = e.target; 
-        let data = []; 
-        const r = f.rowIndex.value; 
-
+        e.preventDefault(); loader(true); const f = e.target; let data = []; const r = f.rowIndex.value; 
         if (type === 'Data_Uraian') data = [f.kode.value, f.nama.value]; 
         if (type === 'Data_Tukang') data = [f.nama.value, f.alamat.value]; 
         if (type === 'Data_Toko') { 
-            let tgl = ""; 
-            if (f.tgl_ttd.value) { try { tgl = new Date(f.tgl_ttd.value).toISOString().slice(0,10); } catch(er){} } 
+            let tgl = ""; if (f.tgl_ttd.value) { try { tgl = new Date(f.tgl_ttd.value).toISOString().slice(0,10); } catch(er){} } 
             data = [f.nama.value, f.jenis.value, f.alamat.value, f.telp.value, f.pemilik.value, tgl]; 
         } 
-        
-        google.script.run.withSuccessHandler(res => { 
-            loader(false); 
-            alert(res); 
-            resetFormMaster(type); 
-            loadMasterTable(type); 
-        }).saveMasterData(DB_ID, type, data, r); 
+        google.script.run.withSuccessHandler(res => { loader(false); showAlert(res, 'success'); resetFormMaster(type); loadMasterTable(type); }).saveMasterData(DB_ID, type, data, r); 
     }
 
     function editMaster(type, index) { 
-        const d = CACHE_DATA[type][index]; 
-        if (!d) return; 
-
+        const d = CACHE_DATA[type][index]; if (!d) return; 
         document.getElementById('idx_'+type).value = index; 
         document.getElementById('btn_'+type).innerText = "Update"; 
         document.getElementById('btn_'+type).classList.replace('btn-primary','btn-warning'); 
         document.getElementById('cancel_'+type).classList.remove('hidden'); 
-
-        if (type === 'Data_Uraian') {
-            document.getElementById('u_kode').value = d[0];
-            document.getElementById('u_nama').value = d[1];
-        } else if (type === 'Data_Tukang') {
-            document.getElementById('k_nama').value = d[0];
-            document.getElementById('k_alamat').value = d[1];
-        } else if (type === 'Data_Toko') {
-            document.getElementById('t_nama').value = d[0];
-            document.getElementById('t_jenis').value = d[1];
-            document.getElementById('t_alamat').value = d[2];
-            document.getElementById('t_telp').value = d[3];
-            document.getElementById('t_pemilik').value = d[4]; 
-            let dv = ""; 
-            if(d[5]) { const x = new Date(d[5]); if(!isNaN(x)) dv = x.toISOString().split('T')[0]; } 
-            document.getElementById('t_tgl_ttd').value = dv;
-        } 
+        if (type === 'Data_Uraian') { document.getElementById('u_kode').value = d[0]; document.getElementById('u_nama').value = d[1]; } 
+        else if (type === 'Data_Tukang') { document.getElementById('k_nama').value = d[0]; document.getElementById('k_alamat').value = d[1]; } 
+        else if (type === 'Data_Toko') { document.getElementById('t_nama').value = d[0]; document.getElementById('t_jenis').value = d[1]; document.getElementById('t_alamat').value = d[2]; document.getElementById('t_telp').value = d[3]; document.getElementById('t_pemilik').value = d[4]; let dv = ""; if(d[5]) { const x = new Date(d[5]); if(!isNaN(x)) dv = x.toISOString().split('T')[0]; } document.getElementById('t_tgl_ttd').value = dv; } 
     }
 
     function resetFormMaster(type) { 
-        document.getElementById('idx_'+type).value = ""; 
-        document.getElementById('btn_'+type).innerText = "Simpan"; 
-        document.getElementById('btn_'+type).classList.replace('btn-warning','btn-primary'); 
-        document.getElementById('cancel_'+type).classList.add('hidden'); 
-        
+        document.getElementById('idx_'+type).value = ""; document.getElementById('btn_'+type).innerText = "Simpan"; 
+        document.getElementById('btn_'+type).classList.replace('btn-warning','btn-primary'); document.getElementById('cancel_'+type).classList.add('hidden'); 
         if (type === 'Data_Uraian') { document.getElementById('u_kode').value = ""; document.getElementById('u_nama').value = ""; } 
         if (type === 'Data_Tukang') { document.getElementById('k_nama').value = ""; document.getElementById('k_alamat').value = ""; } 
         if (type === 'Data_Toko') { ['t_nama','t_jenis','t_alamat','t_telp','t_pemilik','t_tgl_ttd'].forEach(id => document.getElementById(id).value = ""); } 
     }
 
     function deleteMaster(type, index) { 
-        if (!confirm("Hapus data ini?")) return; 
-        loader(true); 
-        google.script.run.withSuccessHandler(r => { loader(false); loadMasterTable(type); }).deleteMasterData(DB_ID, type, index); 
+        showConfirm('Hapus data master ini?', function() {
+            loader(true); google.script.run.withSuccessHandler(r => { loader(false); loadMasterTable(type); showAlert(r, 'success'); }).deleteMasterData(DB_ID, type, index); 
+        });
     }
 
     // ==========================================
-    // 8. TRANSAKSI LOGIC
+    // 7. TRANSAKSI LOGIC (EDIT & UPDATE)
     // ==========================================
 
     function loadDropdowns() { 
-        google.script.run.withSuccessHandler(res => { 
-            CACHE_DROPDOWNS = res; 
-            const u = document.getElementById('trxUraian'); 
-            u.innerHTML = '<option value="">Pilih Uraian...</option>'; 
-            res.uraian.forEach(x => u.add(new Option(x, x))); 
-            renderPihakOptions();
-        }).getDropdownData(DB_ID); 
+        google.script.run.withSuccessHandler(res => { CACHE_DROPDOWNS = res; const u = document.getElementById('trxUraian'); u.innerHTML = '<option value="">Pilih Uraian...</option>'; res.uraian.forEach(x => u.add(new Option(x, x))); renderPihakOptions(); }).getDropdownData(DB_ID); 
     }
 
-    function renderPihakOptions() {
-        const p = document.getElementById('trxPihak');
-        p.innerHTML = '<option value="">Pilih...</option>';
-        let listData = (TRX_MODE === 'belanja') ? CACHE_DROPDOWNS.toko : CACHE_DROPDOWNS.tukang;
-        if (listData && listData.length > 0) listData.forEach(x => p.add(new Option(x, x)));
+    function renderPihakOptions() { 
+        const p = document.getElementById('trxPihak'); p.innerHTML = '<option value="">Pilih...</option>'; 
+        let listData = (TRX_MODE === 'belanja') ? CACHE_DROPDOWNS.toko : CACHE_DROPDOWNS.tukang; 
+        if (listData && listData.length > 0) listData.forEach(x => p.add(new Option(x, x))); 
     }
 
-    function switchTrxMode(mode) {
-        TRX_MODE = mode;
-        document.getElementById('tabBelanja').classList.toggle('active', mode === 'belanja');
-        document.getElementById('tabTukang').classList.toggle('active', mode === 'tukang');
-        
-        if (mode === 'belanja') {
-            document.getElementById('titleTrx').innerText = "Input Transaksi Belanja";
-            document.getElementById('lblPihak').innerText = "Toko";
-        } else {
-            document.getElementById('titleTrx').innerText = "Input Transaksi Tukang";
-            document.getElementById('lblPihak').innerText = "Tukang";
-        }
-        renderPihakOptions();
+    function switchTrxMode(mode) { 
+        TRX_MODE = mode; 
+        document.getElementById('tabBelanja').classList.toggle('active', mode === 'belanja'); 
+        document.getElementById('tabTukang').classList.toggle('active', mode === 'tukang'); 
+        if (mode === 'belanja') { document.getElementById('titleTrx').innerText = "Input Transaksi Belanja"; document.getElementById('lblPihak').innerText = "Toko"; } 
+        else { document.getElementById('titleTrx').innerText = "Input Transaksi Tukang"; document.getElementById('lblPihak').innerText = "Tukang"; } 
+        renderPihakOptions(); 
     }
-
+    
     function addRow() { 
         const tr = document.createElement('tr'); 
         tr.innerHTML = `<td><input class="form-control form-control-sm i-nama"></td><td><input type="number" class="form-control form-control-sm i-vol" oninput="cR(this)"></td><td><input class="form-control form-control-sm i-sat"></td><td><input type="number" class="form-control form-control-sm i-harga" oninput="cR(this)"></td><td><input type="text" class="form-control form-control-sm i-total" readonly value="Rp. 0" data-value="0"></td><td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove();cGT()">x</button></td>`; 
         document.getElementById('trxBody').appendChild(tr); 
     }
-
-    function cR(e) { 
-        const r = e.closest('tr'); 
-        const v = r.querySelector('.i-vol').value || 0; 
-        const h = r.querySelector('.i-harga').value || 0; 
-        const total = v * h;
-        r.querySelector('.i-total').value = formatRupiah(total);       
-        r.querySelector('.i-total').setAttribute('data-value', total); 
-        cGT(); 
-    }
-
-    function cGT() { 
-        let t = 0; 
-        document.querySelectorAll('.i-total').forEach(e => { t += Number(e.getAttribute('data-value') || 0); }); 
-        document.getElementById('grandTotal').innerText = formatRupiah(t); 
-    }
+    function cR(e) { const r = e.closest('tr'); const v = r.querySelector('.i-vol').value || 0; const h = r.querySelector('.i-harga').value || 0; const total = v * h; r.querySelector('.i-total').value = formatRupiah(total); r.querySelector('.i-total').setAttribute('data-value', total); cGT(); }
+    function cGT() { let t = 0; document.querySelectorAll('.i-total').forEach(e => { t += Number(e.getAttribute('data-value') || 0); }); document.getElementById('grandTotal').innerText = formatRupiah(t); }
     
+    // --- SIMPAN / UPDATE TRANSAKSI ---
     function simpanTransaksi(e) { 
-        e.preventDefault(); 
-        const f = e.target;
+        e.preventDefault(); const f = e.target;
         const h = { tanggal: f.tanggal.value, toko: f.toko.value, uraian: f.uraian.value, no_bukti: f.no_bukti.value };
         const it = []; 
-        
+        const idEdit = document.getElementById('trxIdEdit').value; // Ambil ID jika sedang edit
+
         document.querySelectorAll('#trxBody tr').forEach(r => { 
             it.push({ nama: r.querySelector('.i-nama').value, vol: r.querySelector('.i-vol').value, sat: r.querySelector('.i-sat').value, harga: r.querySelector('.i-harga').value, total: r.querySelector('.i-total').getAttribute('data-value') || 0 });
         }); 
         
-        if (it.length === 0) return alert("Belum ada barang yang diinput!"); 
+        if (it.length === 0) return showAlert("Belum ada barang yang diinput!", "warning"); 
         loader(true); 
         
         google.script.run.withSuccessHandler(r => { 
-            loader(false); 
-            alert(r); 
-            f.reset(); 
-            document.getElementById('trxBody').innerHTML = ''; 
-            document.getElementById('grandTotal').innerText = "Rp. 0";
-            addRow();
-            switchTrxMode('belanja');
-            loadRiwayat();
-            loadStats(); 
-        }).processTransaksiLengkap(DB_ID, h, it); 
+            loader(false); showAlert(r, 'success'); 
+            cancelEditMode(); // Reset form & tombol
+            loadRiwayat(); loadStats(); 
+        }).processTransaksiLengkap(DB_ID, h, it, idEdit); 
     }
 
     // ==========================================
-    // 9. RIWAYAT LOGIC
+    // 8. RIWAYAT & EDIT (LOGIKA UPDATE TANPA HAPUS)
     // ==========================================
 
     function loadRiwayat() {
         const tbody = document.getElementById('tbody_riwayat');
         tbody.innerHTML = '<tr><td colspan="6" class="text-center"><div class="spinner-border spinner-border-sm text-primary"></div> Memuat...</td></tr>';
-        
         google.script.run.withSuccessHandler(data => {
-            CACHE_DATA.Riwayat = data; 
-            tbody.innerHTML = '';
-            
+            CACHE_DATA.Riwayat = data; tbody.innerHTML = '';
             if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Belum ada data transaksi.</td></tr>'; return; }
-            
             data.forEach((trx, index) => {
                 let itemStr = trx.items.map(i => `&bull; <b>${i.nama}</b> (${i.vol} ${i.sat} @ ${formatRupiah(i.harga)} = ${formatRupiah(i.total)})`).join('<span class="mx-3 text-muted">|</span>');
                 const tr = document.createElement('tr');
@@ -377,344 +302,74 @@
     }
 
     function deleteTransaksi(idTrx) {
-        if (!confirm("Yakin ingin menghapus transaksi ini?")) return;
-        loader(true);
-        google.script.run.withSuccessHandler(res => { loader(false); loadRiwayat(); loadStats(); }).deleteTransaksiById(DB_ID, idTrx);
+        showConfirm("Yakin ingin menghapus transaksi ini?", function() {
+            loader(true); google.script.run.withSuccessHandler(res => { loader(false); loadRiwayat(); loadStats(); showAlert(res, 'success'); }).deleteTransaksiById(DB_ID, idTrx);
+        });
     }
 
     function editTransaksi(index) {
-        if (!confirm("Edit Transaksi?")) return;
-        
-        const trx = CACHE_DATA.Riwayat[index];
-        if (!trx) return;
+        showConfirm("Edit transaksi ini? Data akan dimuat ke form input.", function() {
+            const trx = CACHE_DATA.Riwayat[index];
+            if (!trx) return;
 
-        if (CACHE_DROPDOWNS.tukang && CACHE_DROPDOWNS.tukang.includes(trx.toko)) switchTrxMode('tukang'); else switchTrxMode('belanja');
+            // 1. Scroll ke Form
+            document.getElementById('view-transaksi').scrollIntoView({behavior: 'smooth'});
 
-        document.getElementById('trxTanggal').value = trx.tanggal;
-        document.getElementById('trxPihak').value = trx.toko; 
-        document.getElementById('trxUraian').value = trx.uraian;
-        document.getElementById('trxBukti').value = trx.no_bukti;
+            // 2. Set Mode Edit (Tanpa hapus data DB)
+            document.getElementById('trxIdEdit').value = trx.id;
+            document.getElementById('btnSimpanTrx').innerText = "UPDATE"; 
+            document.getElementById('btnSimpanTrx').classList.replace('btn-primary', 'btn-warning');
+            document.getElementById('btnBatalEdit').classList.remove('hidden');
+            document.getElementById('titleTrx').innerText = "Edit Transaksi: " + trx.id;
 
-        const tbody = document.getElementById('trxBody');
-        tbody.innerHTML = ''; 
-        trx.items.forEach(item => {
-            const tr = document.createElement('tr'); 
-            tr.innerHTML = `<td><input class="form-control form-control-sm i-nama" value="${item.nama}"></td><td><input type="number" class="form-control form-control-sm i-vol" value="${item.vol}" oninput="cR(this)"></td><td><input class="form-control form-control-sm i-sat" value="${item.sat}"></td><td><input type="number" class="form-control form-control-sm i-harga" value="${item.harga}" oninput="cR(this)"></td><td><input type="text" class="form-control form-control-sm i-total" readonly value="${formatRupiah(item.total)}" data-value="${item.total}"></td><td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove();cGT()">x</button></td>`; 
-            tbody.appendChild(tr);
-        });
-        
-        cGT(); 
-        loader(true);
-        google.script.run.withSuccessHandler(() => { loader(false); loadRiwayat(); document.getElementById('view-transaksi').scrollIntoView({behavior: 'smooth'}); }).deleteTransaksiById(DB_ID, trx.id);
-    }
+            // 3. Isi Header
+            if (CACHE_DROPDOWNS.tukang && CACHE_DROPDOWNS.tukang.includes(trx.toko)) switchTrxMode('tukang'); else switchTrxMode('belanja');
+            document.getElementById('trxTanggal').value = trx.tanggal;
+            document.getElementById('trxPihak').value = trx.toko; 
+            document.getElementById('trxUraian').value = trx.uraian;
+            document.getElementById('trxBukti').value = trx.no_bukti;
 
-    // ==========================================
-    // 10. LOGIC PENGATURAN CETAK (BARU)
-    // ==========================================
-
-    // --- A. KOP SURAT ---
-    function previewKop(input) {
-        if (input.files && input.files[0]) {
-            var reader = new FileReader();
-            reader.onload = function (e) {
-                document.getElementById('previewImgKop').src = e.target.result;
-                document.getElementById('previewImgKop').style.display = 'block';
-                document.getElementById('noKopText').style.display = 'none';
-            };
-            reader.readAsDataURL(input.files[0]);
-        }
-    }
-
-    function uploadKopSurat() {
-        const input = document.getElementById('fileKop');
-        if (!input.files || !input.files[0]) return alert("Pilih file gambar dulu!");
-        
-        loader(true);
-        const file = input.files[0];
-        const reader = new FileReader();
-        
-        reader.onload = function(e) {
-            // Kita ambil base64 murni (tanpa prefix data:image...) untuk dikirim ke server
-            const content = e.target.result.split(',')[1]; 
-            
-            google.script.run.withSuccessHandler(res => {
-                loader(false);
-                if(res.status === 'success') {
-                    alert("Kop Surat berhasil disimpan ke Database!");
-                    
-                    // UPDATE CACHE & TAMPILAN LANGSUNG (PENTING)
-                    // res.url berisi string data:image lengkap dari server
-                    try {
-                        localStorage.setItem('bos_kop_image', res.url);
-                    } catch (e) {
-                        console.log("Gagal update cache lokal");
-                    }
-                    
-                    document.getElementById('previewImgKop').src = res.url;
-                    document.getElementById('previewImgKop').style.display = 'block';
-                    document.getElementById('noKopText').style.display = 'none';
-                    
-                } else {
-                    alert("Gagal: " + res.message);
-                }
-            }).saveKopSuratToDrive(DB_ID, content, file.type, SEKOLAH_NAMA);
-        };
-        reader.readAsDataURL(file);
-    }
-
-    function loadExistingKop() {
-        const img = document.getElementById('previewImgKop');
-        const txt = document.getElementById('noKopText');
-        
-        // 1. CEK CACHE LOKAL (Agar Instan)
-        const cachedKop = localStorage.getItem('bos_kop_image');
-        
-        if (cachedKop) {
-            img.src = cachedKop;
-            img.style.display = 'block';
-            txt.style.display = 'none';
-        }
-
-        // 2. TETAP PANGGIL SERVER (Background Check)
-        // Gunanya untuk memastikan jika ada perubahan data di device lain,
-        // atau jika cache belum ada.
-        google.script.run.withSuccessHandler(url => {
-            if(url) {
-                // Jika URL dari server berbeda dengan cache (atau cache kosong), update!
-                if (url !== cachedKop) {
-                    img.src = url;
-                    img.style.display = 'block';
-                    txt.style.display = 'none';
-                    
-                    // Simpan ke localStorage
-                    try {
-                        localStorage.setItem('bos_kop_image', url);
-                    } catch (e) {
-                        console.log("Storage penuh, gagal cache gambar.");
-                    }
-                }
-            } else {
-                // Jika di server tidak ada gambar (dihapus), reset tampilan & cache
-                if (cachedKop) {
-                    localStorage.removeItem('bos_kop_image');
-                    img.style.display = 'none';
-                    txt.style.display = 'block';
-                } else {
-                    img.style.display = 'none';
-                    txt.style.display = 'block';
-                }
-            }
-        }).getKopSuratUrl(DB_ID);
-    }
-
-    // --- B. NOMOR SURAT ---
-    function loadPengaturanNomor() {
-        const tbody = document.getElementById('tbody_setting_nomor');
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center">Memuat data transaksi...</td></tr>';
-        
-        google.script.run.withSuccessHandler(trxData => {
-            google.script.run.withSuccessHandler(nomorData => {
-                CACHE_NOMOR_SURAT = nomorData; 
-                renderTableNomor(trxData, nomorData);
-            }).getNomorSuratData(DB_ID);
-        }).getRiwayatTransaksiGrouped(DB_ID);
-    }
-
-    function renderTableNomor(trxList, nomorMap) {
-        const tbody = document.getElementById('tbody_setting_nomor');
-        tbody.innerHTML = '';
-        
-        if (!trxList || trxList.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center">Belum ada transaksi. Input transaksi dulu.</td></tr>'; return; }
-
-        trxList.forEach(trx => {
-            const id = trx.id;
-            const saved = nomorMap[id];
-            
-            let statusBadge = '<span class="badge bg-danger">Belum Diisi</span>';
-            if (saved && saved.keluar && saved.bayar) statusBadge = '<span class="badge bg-success">Sudah Diisi</span>';
-
-            const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${trx.tanggal}</td><td>${trx.toko}</td><td>${trx.uraian}</td><td class="text-center">${statusBadge}</td><td class="text-center"><button class="btn btn-primary btn-sm" onclick="openModalNomor('${id}', '${trx.toko}')"><i class="fas fa-list-ol"></i> Input No</button></td>`;
-            tbody.appendChild(tr);
+            // 4. Isi Body (Barang)
+            const tbody = document.getElementById('trxBody'); tbody.innerHTML = ''; 
+            trx.items.forEach(item => {
+                const tr = document.createElement('tr'); 
+                tr.innerHTML = `<td><input class="form-control form-control-sm i-nama" value="${item.nama}"></td><td><input type="number" class="form-control form-control-sm i-vol" value="${item.vol}" oninput="cR(this)"></td><td><input class="form-control form-control-sm i-sat" value="${item.sat}"></td><td><input type="number" class="form-control form-control-sm i-harga" value="${item.harga}" oninput="cR(this)"></td><td><input type="text" class="form-control form-control-sm i-total" readonly value="${formatRupiah(item.total)}" data-value="${item.total}"></td><td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove();cGT()">x</button></td>`; 
+                tbody.appendChild(tr);
+            });
+            cGT(); 
+            showAlert("Mode Edit Aktif. Silakan ubah data dan klik Update.", "info");
         });
     }
 
-    function openModalNomor(trxId, pihakName) {
-        document.getElementById('formNomorSurat').reset();
-        document.getElementById('ns_id_trx').value = trxId;
-        
-        let isTukang = false;
-        if (CACHE_DROPDOWNS.tukang && CACHE_DROPDOWNS.tukang.includes(pihakName)) isTukang = true;
-        
-        document.getElementById('ns_jenis_pihak').value = isTukang ? 'tukang' : 'toko';
-        
-        // --- PERUBAHAN DI SINI (DISABLE vs HIDDEN) ---
-        const inputMasuk = document.getElementById('ns_masuk');
-        
-        if (isTukang) {
-            // Jika Tukang: Disable input nomor nota, ubah label dinamis
-            inputMasuk.disabled = true;
-            inputMasuk.value = ""; // Kosongkan nilai
-            inputMasuk.placeholder = "Tidak perlu diisi (Jasa Tukang)";
-            
-            document.getElementById('lbl_ns_periksa').innerText = "Pekerjaan"; 
-            document.getElementById('lbl_ns_terima').innerText = "Pekerjaan";  
-        } else {
-            // Jika Toko: Enable input
-            inputMasuk.disabled = false;
-            inputMasuk.placeholder = "Nomor Nota/Faktur";
-            
-            document.getElementById('lbl_ns_periksa').innerText = "Barang";
-            document.getElementById('lbl_ns_terima').innerText = "Barang";
-        }
-        // ---------------------------------------------
-
-        const saved = CACHE_NOMOR_SURAT[trxId];
-        if (saved) {
-            document.getElementById('ns_keluar').value = saved.keluar || '';
-            // Hanya isi jika tidak disabled (atau biarkan kosong jika tukang)
-            if (!isTukang) document.getElementById('ns_masuk').value = saved.masuk || '';
-            document.getElementById('ns_periksa').value = saved.periksa || '';
-            document.getElementById('ns_terima').value = saved.terima || '';
-            document.getElementById('ns_bayar').value = saved.bayar || '';
-        }
-
-        const myModal = new bootstrap.Modal(document.getElementById('modalNomorSurat'));
-        myModal.show();
+    function cancelEditMode() {
+        document.getElementById('formTrx').reset();
+        document.getElementById('trxBody').innerHTML = '';
+        document.getElementById('grandTotal').innerText = "Rp. 0";
+        document.getElementById('trxIdEdit').value = ""; 
+        document.getElementById('btnSimpanTrx').innerText = "SIMPAN";
+        document.getElementById('btnSimpanTrx').classList.replace('btn-warning', 'btn-primary');
+        document.getElementById('btnBatalEdit').classList.add('hidden');
+        document.getElementById('titleTrx').innerText = "Input Transaksi Belanja"; // Kembalikan judul
+        switchTrxMode('belanja'); addRow(); 
     }
 
-    function simpanNomorSurat(e) {
-        e.preventDefault();
-        loader(true);
-        
-        const f = e.target;
-        const data = { id_trx: f.id_trx.value, no_keluar: f.no_keluar.value, no_masuk: f.no_masuk.value, no_periksa: f.no_periksa.value, no_terima: f.no_terima.value, no_bayar: f.no_bayar.value };
-        
-        google.script.run.withSuccessHandler(res => {
-            loader(false);
-            const modalEl = document.getElementById('modalNomorSurat');
-            const modal = bootstrap.Modal.getInstance(modalEl);
-            modal.hide();
-            loadPengaturanNomor();
-            alert(res);
-        }).saveNomorSuratData(DB_ID, data);
-    }
+    // ==========================================
+    // 9. PENGATURAN CETAK
+    // ==========================================
 
-    // --- C. PENGATURAN TANGGAL (BARU) ---
+    function previewKop(input) { if (input.files && input.files[0]) { var reader = new FileReader(); reader.onload = function (e) { document.getElementById('previewImgKop').src = e.target.result; document.getElementById('previewImgKop').style.display = 'block'; document.getElementById('noKopText').style.display = 'none'; }; reader.readAsDataURL(input.files[0]); } }
+    function uploadKopSurat() { const input = document.getElementById('fileKop'); if (!input.files || !input.files[0]) return showAlert("Pilih file gambar dulu!", "warning"); loader(true); const file = input.files[0]; const reader = new FileReader(); reader.onload = function(e) { const content = e.target.result.split(',')[1]; google.script.run.withSuccessHandler(res => { loader(false); if(res.status === 'success') { showAlert("Kop Surat berhasil disimpan!", "success"); try { localStorage.setItem('bos_kop_image', res.url); } catch (e) {} document.getElementById('previewImgKop').src = res.url; document.getElementById('previewImgKop').style.display = 'block'; document.getElementById('noKopText').style.display = 'none'; } else { showAlert("Gagal: " + res.message, "danger"); } }).saveKopSuratToDrive(DB_ID, content, file.type, SEKOLAH_NAMA); }; reader.readAsDataURL(file); }
+    function loadExistingKop() { const img = document.getElementById('previewImgKop'); const txt = document.getElementById('noKopText'); const cachedKop = localStorage.getItem('bos_kop_image'); if (cachedKop) { img.src = cachedKop; img.style.display = 'block'; txt.style.display = 'none'; } google.script.run.withSuccessHandler(url => { if(url) { if (url !== cachedKop) { img.src = url; img.style.display = 'block'; txt.style.display = 'none'; try { localStorage.setItem('bos_kop_image', url); } catch (e) {} } } else { if (cachedKop) { localStorage.removeItem('bos_kop_image'); img.style.display = 'none'; txt.style.display = 'block'; } else { img.style.display = 'none'; txt.style.display = 'block'; } } }).getKopSuratUrl(DB_ID); }
+
+    function loadPengaturanNomor() { const tbody = document.getElementById('tbody_setting_nomor'); tbody.innerHTML = '<tr><td colspan="5" class="text-center">Memuat data transaksi...</td></tr>'; google.script.run.withSuccessHandler(trxData => { google.script.run.withSuccessHandler(nomorData => { CACHE_NOMOR_SURAT = nomorData; renderTableNomor(trxData, nomorData); }).getNomorSuratData(DB_ID); }).getRiwayatTransaksiGrouped(DB_ID); }
+    function renderTableNomor(trxList, nomorMap) { const tbody = document.getElementById('tbody_setting_nomor'); tbody.innerHTML = ''; if (!trxList || trxList.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center">Belum ada transaksi.</td></tr>'; return; } trxList.forEach(trx => { const id = trx.id; const saved = nomorMap[id]; let statusBadge = '<span class="badge bg-danger">Belum Diisi</span>'; if (saved && saved.keluar && saved.bayar) statusBadge = '<span class="badge bg-success">Sudah Diisi</span>'; const tr = document.createElement('tr'); tr.innerHTML = `<td>${trx.tanggal}</td><td>${trx.toko}</td><td>${trx.uraian}</td><td class="text-center">${statusBadge}</td><td class="text-center"><button class="btn btn-primary btn-sm" onclick="openModalNomor('${id}', '${trx.toko}')"><i class="fas fa-list-ol"></i> Input No</button></td>`; tbody.appendChild(tr); }); }
+    function openModalNomor(trxId, pihakName) { document.getElementById('formNomorSurat').reset(); document.getElementById('ns_id_trx').value = trxId; let isTukang = (CACHE_DROPDOWNS.tukang && CACHE_DROPDOWNS.tukang.includes(pihakName)); document.getElementById('ns_jenis_pihak').value = isTukang ? 'tukang' : 'toko'; const inputMasuk = document.getElementById('ns_masuk'); if (isTukang) { inputMasuk.disabled = true; inputMasuk.value = ""; inputMasuk.placeholder = "Tidak perlu diisi (Jasa Tukang)"; document.getElementById('lbl_ns_periksa').innerText = "Pekerjaan"; document.getElementById('lbl_ns_terima').innerText = "Pekerjaan"; } else { inputMasuk.disabled = false; inputMasuk.placeholder = "Nomor Nota/Faktur"; document.getElementById('lbl_ns_periksa').innerText = "Barang"; document.getElementById('lbl_ns_terima').innerText = "Barang"; } const saved = CACHE_NOMOR_SURAT[trxId]; if (saved) { document.getElementById('ns_keluar').value = saved.keluar || ''; if (!isTukang) document.getElementById('ns_masuk').value = saved.masuk || ''; document.getElementById('ns_periksa').value = saved.periksa || ''; document.getElementById('ns_terima').value = saved.terima || ''; document.getElementById('ns_bayar').value = saved.bayar || ''; } new bootstrap.Modal(document.getElementById('modalNomorSurat')).show(); }
+    function simpanNomorSurat(e) { e.preventDefault(); loader(true); const f = e.target; const data = { id_trx: f.id_trx.value, no_keluar: f.no_keluar.value, no_masuk: f.no_masuk.value, no_periksa: f.no_periksa.value, no_terima: f.no_terima.value, no_bayar: f.no_bayar.value }; google.script.run.withSuccessHandler(res => { loader(false); bootstrap.Modal.getInstance(document.getElementById('modalNomorSurat')).hide(); loadPengaturanNomor(); showAlert(res, 'success'); }).saveNomorSuratData(DB_ID, data); }
     
-    // Dipanggil saat klik tab "Pengaturan Tanggal"
-    // (Anda perlu mengubah onclick di HTML tab tanggal menjadi: onclick="loadPengaturanTanggal()")
-    function loadPengaturanTanggal() {
-        const tbody = document.getElementById('tbody_setting_tanggal');
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center"><div class="spinner-border spinner-border-sm"></div> Memuat data transaksi...</td></tr>';
-        
-        // 1. Ambil list transaksi (Grouped)
-        google.script.run.withSuccessHandler(trxData => {
-            // 2. Ambil data tanggal yang tersimpan
-            google.script.run.withSuccessHandler(tanggalData => {
-                CACHE_TANGGAL_SURAT = tanggalData; 
-                renderTableTanggal(trxData, tanggalData);
-            }).getTanggalSuratData(DB_ID);
-        }).getRiwayatTransaksiGrouped(DB_ID);
-    }
-
-    function renderTableTanggal(trxList, tanggalMap) {
-        const tbody = document.getElementById('tbody_setting_tanggal');
-        tbody.innerHTML = '';
-        
-        if (!trxList || trxList.length === 0) { 
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center">Belum ada transaksi. Input transaksi dulu.</td></tr>'; 
-            return; 
-        }
-
-        trxList.forEach(trx => {
-            const id = trx.id;
-            const saved = tanggalMap[id];
-            
-            // Cek kelengkapan (misal: jika tgl bayar ada, dianggap sudah diisi)
-            let statusBadge = '<span class="badge bg-danger">Belum Diisi</span>';
-            if (saved && saved.bayar) statusBadge = '<span class="badge bg-success">Sudah Diisi</span>';
-
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${trx.tanggal}</td>
-                <td>${trx.toko}</td>
-                <td>${trx.uraian}</td>
-                <td class="text-center">${statusBadge}</td>
-                <td class="text-center">
-                    <button class="btn btn-warning btn-sm" onclick="openModalTanggal('${id}', '${trx.toko}')">
-                        <i class="fas fa-calendar-day"></i> Set Tanggal
-                    </button>
-                </td>`;
-            tbody.appendChild(tr);
-        });
-    }
-
-    function openModalTanggal(trxId, pihakName) {
-        document.getElementById('formTanggalSurat').reset();
-        document.getElementById('ts_id_trx').value = trxId;
-        
-        // Cek apakah Tukang atau Toko
-        let isTukang = false;
-        if (CACHE_DROPDOWNS.tukang && CACHE_DROPDOWNS.tukang.includes(pihakName)) isTukang = true;
-        
-        document.getElementById('ts_jenis_pihak').value = isTukang ? 'tukang' : 'toko';
-        
-        // --- PERUBAHAN DI SINI (DISABLE vs HIDDEN) ---
-        const inputTglMasuk = document.getElementById('ts_masuk');
-
-        if (isTukang) {
-            // Jika Tukang: Disable input tanggal nota
-            inputTglMasuk.disabled = true;
-            inputTglMasuk.value = ""; // Pastikan kosong
-            
-            document.getElementById('lbl_ts_periksa').innerText = "Pekerjaan"; 
-            document.getElementById('lbl_ts_terima').innerText = "Pekerjaan";  
-        } else {
-            // Jika Toko: Enable input
-            inputTglMasuk.disabled = false;
-            
-            document.getElementById('lbl_ts_periksa').innerText = "Barang";
-            document.getElementById('lbl_ts_terima').innerText = "Barang";
-        }
-        // ---------------------------------------------
-
-        // Isi data jika sudah ada di Cache
-        const saved = CACHE_TANGGAL_SURAT[trxId];
-        if (saved) {
-            if (!isTukang) document.getElementById('ts_masuk').value = saved.masuk || '';
-            document.getElementById('ts_periksa').value = saved.periksa || '';
-            document.getElementById('ts_terima').value = saved.terima || '';
-            document.getElementById('ts_bayar').value = saved.bayar || '';
-        }
-
-        const myModal = new bootstrap.Modal(document.getElementById('modalTanggalSurat'));
-        myModal.show();
-    }
-
-    function simpanTanggalSurat(e) {
-        e.preventDefault();
-        loader(true);
-        
-        const f = e.target;
-        const data = { 
-            id_trx: f.id_trx.value, 
-            tgl_masuk: f.tgl_masuk.value, 
-            tgl_periksa: f.tgl_periksa.value, 
-            tgl_terima: f.tgl_terima.value, 
-            tgl_bayar: f.tgl_bayar.value 
-        };
-        
-        google.script.run.withSuccessHandler(res => {
-            loader(false);
-            const modalEl = document.getElementById('modalTanggalSurat');
-            const modal = bootstrap.Modal.getInstance(modalEl);
-            modal.hide();
-            
-            loadPengaturanTanggal(); // Reload tabel
-            alert(res);
-        }).saveTanggalSuratData(DB_ID, data);
-    }
+    function loadPengaturanTanggal() { const tbody = document.getElementById('tbody_setting_tanggal'); tbody.innerHTML = '<tr><td colspan="5" class="text-center"><div class="spinner-border spinner-border-sm"></div> Memuat data...</td></tr>'; google.script.run.withSuccessHandler(trxData => { google.script.run.withSuccessHandler(tanggalData => { CACHE_TANGGAL_SURAT = tanggalData; renderTableTanggal(trxData, tanggalData); }).getTanggalSuratData(DB_ID); }).getRiwayatTransaksiGrouped(DB_ID); }
+    function renderTableTanggal(trxList, tanggalMap) { const tbody = document.getElementById('tbody_setting_tanggal'); tbody.innerHTML = ''; if (!trxList || trxList.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center">Belum ada transaksi.</td></tr>'; return; } trxList.forEach(trx => { const id = trx.id; const saved = tanggalMap[id]; let statusBadge = '<span class="badge bg-danger">Belum Diisi</span>'; if (saved && saved.bayar) statusBadge = '<span class="badge bg-success">Sudah Diisi</span>'; const tr = document.createElement('tr'); tr.innerHTML = `<td>${trx.tanggal}</td><td>${trx.toko}</td><td>${trx.uraian}</td><td class="text-center">${statusBadge}</td><td class="text-center"><button class="btn btn-warning btn-sm" onclick="openModalTanggal('${id}', '${trx.toko}')"><i class="fas fa-calendar-day"></i> Set Tanggal</button></td>`; tbody.appendChild(tr); }); }
+    function openModalTanggal(trxId, pihakName) { document.getElementById('formTanggalSurat').reset(); document.getElementById('ts_id_trx').value = trxId; let isTukang = (CACHE_DROPDOWNS.tukang && CACHE_DROPDOWNS.tukang.includes(pihakName)); document.getElementById('ts_jenis_pihak').value = isTukang ? 'tukang' : 'toko'; const inputTglMasuk = document.getElementById('ts_masuk'); if (isTukang) { inputTglMasuk.disabled = true; inputTglMasuk.value = ""; document.getElementById('lbl_ts_periksa').innerText = "Pekerjaan"; document.getElementById('lbl_ts_terima').innerText = "Pekerjaan"; } else { inputTglMasuk.disabled = false; document.getElementById('lbl_ts_periksa').innerText = "Barang"; document.getElementById('lbl_ts_terima').innerText = "Barang"; } const saved = CACHE_TANGGAL_SURAT[trxId]; if (saved) { if (!isTukang) document.getElementById('ts_masuk').value = saved.masuk || ''; document.getElementById('ts_periksa').value = saved.periksa || ''; document.getElementById('ts_terima').value = saved.terima || ''; document.getElementById('ts_bayar').value = saved.bayar || ''; } new bootstrap.Modal(document.getElementById('modalTanggalSurat')).show(); }
+    function simpanTanggalSurat(e) { e.preventDefault(); loader(true); const f = e.target; const data = { id_trx: f.id_trx.value, tgl_masuk: f.tgl_masuk.value, tgl_periksa: f.tgl_periksa.value, tgl_terima: f.tgl_terima.value, tgl_bayar: f.tgl_bayar.value }; google.script.run.withSuccessHandler(res => { loader(false); bootstrap.Modal.getInstance(document.getElementById('modalTanggalSurat')).hide(); loadPengaturanTanggal(); showAlert(res, 'success'); }).saveTanggalSuratData(DB_ID, data); }
     
     // Init Empty Row
     addRow();
