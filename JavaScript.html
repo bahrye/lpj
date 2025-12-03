@@ -1,0 +1,187 @@
+<script>
+    let DB_ID = localStorage.getItem('bos_db_id');
+    let SEKOLAH_NAMA = localStorage.getItem('bos_sekolah_nama');
+    
+    // CACHE DATA GLOBAL (PENTING AGAR EDIT TIDAK ERROR)
+    let CACHE_DATA = {
+        Data_Uraian: [],
+        Data_Toko: [],
+        Data_Tukang: []
+    };
+
+    if(DB_ID) { initDashboard(); } else { document.getElementById('authContainer').classList.remove('hidden'); }
+
+    function loader(show) { document.getElementById('loader').style.display = show ? 'flex' : 'none'; }
+    function toggleSidebar() {
+      document.getElementById('wrapper').classList.toggle('toggled');
+      document.getElementById('sidebar-wrapper').style.marginLeft = document.getElementById('wrapper').classList.contains('toggled') ? "0" : "-15rem";
+    }
+
+    // --- AUTH ---
+    function switchAuth(type) {
+        document.getElementById('btnTabLogin').classList.toggle('active', type === 'login');
+        document.getElementById('btnTabReg').classList.toggle('active', type === 'register');
+        document.getElementById('formLogin').classList.toggle('hidden', type !== 'login');
+        document.getElementById('formRegister').classList.toggle('hidden', type !== 'register');
+    }
+    function handleRegister(e) { e.preventDefault(); loader(true); google.script.run.withSuccessHandler(res => { loader(false); alert(res.message); if(res.status==='success') switchAuth('login'); }).registerUser(Object.fromEntries(new FormData(e.target))); }
+    function handleLogin(e) { e.preventDefault(); loader(true); google.script.run.withSuccessHandler(res => { loader(false); if(res.status==='success') { DB_ID=res.token; SEKOLAH_NAMA=res.sekolah; localStorage.setItem('bos_db_id', DB_ID); localStorage.setItem('bos_sekolah_nama', SEKOLAH_NAMA); initDashboard(); } else { alert(res.message); } }).loginUser(Object.fromEntries(new FormData(e.target))); }
+    function logout() { if(confirm('Keluar?')) { localStorage.clear(); location.reload(); } }
+    function initDashboard() { document.getElementById('authContainer').classList.add('hidden'); document.getElementById('wrapper').classList.remove('hidden'); document.getElementById('displaySekolah').innerText = SEKOLAH_NAMA; toggleSidebar(); openView('dashboard'); }
+
+    // --- NAVIGATION ---
+    function openView(viewName) {
+      document.querySelectorAll('.app-view').forEach(el => el.classList.add('hidden'));
+      document.getElementById('view-' + viewName).classList.remove('hidden');
+      if(viewName === 'sekolah') loadSekolahData();
+      if(viewName === 'dashboard') loadStats();
+      if(viewName === 'transaksi') loadDropdowns();
+      if(viewName === 'master') loadMasterTable('Data_Uraian');
+    }
+
+    // --- LOGIKA DATA MASTER (FIXED) ---
+    
+    function loadMasterTable(type) {
+        const tbody = document.getElementById('tbody_' + type);
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center">Memuat data...</td></tr>';
+
+        google.script.run.withSuccessHandler(data => {
+            CACHE_DATA[type] = data; // Simpan ke Cache Global
+            tbody.innerHTML = '';
+            
+            if(!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Belum ada data</td></tr>';
+                return;
+            }
+
+            data.forEach((row, index) => {
+                let html = '';
+                // Gunakan index untuk tombol Edit, jangan pass object row langsung (rawan error)
+                const btns = `<td>
+                    <button class="btn btn-warning btn-sm py-0 px-1" onclick="editMaster('${type}', ${index})"><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-danger btn-sm py-0 px-1" onclick="deleteMaster('${type}', ${index})"><i class="fas fa-trash"></i></button>
+                </td>`;
+
+                if(type === 'Data_Uraian') {
+                    html = `<td>${row[0]||''}</td><td>${row[1]||''}</td>${btns}`;
+                } else if(type === 'Data_Toko') {
+                    // Cek kelengkapan data (mencegah undefined)
+                    const nama = row[0] || '-';
+                    const jenis = row[1] || '';
+                    const alamat = row[2] || '-';
+                    const telp = row[3] || '';
+                    const pemilik = row[4] || '-';
+                    
+                    html = `<td><b>${nama}</b><br><small class="text-muted">${jenis}</small></td>
+                            <td>${alamat}<br><small class="text-muted">${telp}</small></td>
+                            <td>${pemilik}</td>
+                            ${btns}`;
+                } else if(type === 'Data_Tukang') {
+                    html = `<td>${row[0]||''}</td><td>${row[1]||''}</td>${btns}`;
+                }
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = html;
+                tbody.appendChild(tr);
+            });
+        }).getAllMasterData(DB_ID, type);
+    }
+
+    function simpanMaster(e, type) {
+        e.preventDefault();
+        loader(true);
+        const f = e.target;
+        let data = [];
+        const rowIndex = f.rowIndex.value;
+
+        if(type === 'Data_Uraian') data = [f.kode.value, f.nama.value];
+        if(type === 'Data_Tukang') data = [f.nama.value, f.alamat.value];
+        if(type === 'Data_Toko') {
+            // Konversi tanggal aman
+            let tgl = "";
+            if(f.tgl_ttd.value) {
+                try { tgl = new Date(f.tgl_ttd.value).toISOString().slice(0, 10); } catch(err) {}
+            }
+            data = [f.nama.value, f.jenis.value, f.alamat.value, f.telp.value, f.pemilik.value, tgl];
+        }
+
+        google.script.run.withSuccessHandler(res => {
+            loader(false);
+            alert(res);
+            resetFormMaster(type);
+            loadMasterTable(type); 
+        }).saveMasterData(DB_ID, type, data, rowIndex);
+    }
+
+    function editMaster(type, index) {
+        // Ambil data dari CACHE berdasarkan index
+        const rowData = CACHE_DATA[type][index];
+        if(!rowData) return;
+
+        document.getElementById('idx_' + type).value = index;
+        document.getElementById('btn_' + type).innerText = "Update";
+        document.getElementById('btn_' + type).classList.replace('btn-primary', 'btn-warning');
+        document.getElementById('cancel_' + type).classList.remove('hidden');
+
+        if(type === 'Data_Uraian') {
+            document.getElementById('u_kode').value = rowData[0];
+            document.getElementById('u_nama').value = rowData[1];
+        } else if(type === 'Data_Tukang') {
+            document.getElementById('k_nama').value = rowData[0];
+            document.getElementById('k_alamat').value = rowData[1];
+        } else if(type === 'Data_Toko') {
+            document.getElementById('t_nama').value = rowData[0];
+            document.getElementById('t_jenis').value = rowData[1];
+            document.getElementById('t_alamat').value = rowData[2];
+            document.getElementById('t_telp').value = rowData[3];
+            document.getElementById('t_pemilik').value = rowData[4];
+            
+            // Handle Tanggal dari Sheet (String ISO atau Object Date)
+            let dateVal = "";
+            if(rowData[5]) {
+                const d = new Date(rowData[5]);
+                if(!isNaN(d)) dateVal = d.toISOString().split('T')[0];
+            }
+            document.getElementById('t_tgl_ttd').value = dateVal;
+        }
+    }
+
+    function resetFormMaster(type) {
+        document.getElementById('idx_' + type).value = "";
+        document.getElementById('btn_' + type).innerText = "Simpan";
+        document.getElementById('btn_' + type).classList.replace('btn-warning', 'btn-primary');
+        document.getElementById('cancel_' + type).classList.add('hidden');
+        
+        if(type === 'Data_Uraian') { document.getElementById('u_kode').value = ""; document.getElementById('u_nama').value = ""; }
+        if(type === 'Data_Tukang') { document.getElementById('k_nama').value = ""; document.getElementById('k_alamat').value = ""; }
+        if(type === 'Data_Toko') { 
+             ['t_nama','t_jenis','t_alamat','t_telp','t_pemilik','t_tgl_ttd'].forEach(id => document.getElementById(id).value = "");
+        }
+    }
+
+    function deleteMaster(type, index) {
+        if(!confirm("Hapus data ini?")) return;
+        loader(true);
+        google.script.run.withSuccessHandler(res => {
+            loader(false);
+            loadMasterTable(type);
+        }).deleteMasterData(DB_ID, type, index);
+    }
+
+    // --- LAINNYA ---
+    function loadSekolahData() { google.script.run.withSuccessHandler(data => { const f=document.getElementById('formSekolah'); for(const [k,v] of Object.entries(data)) if(f.elements[k]) f.elements[k].value=v; }).getDataSekolah(DB_ID); }
+    function simpanSekolah(e) { e.preventDefault(); loader(true); google.script.run.withSuccessHandler(res => { loader(false); alert(res); }).saveDataSekolah(DB_ID, Object.fromEntries(new FormData(e.target))); }
+    function loadStats() { google.script.run.withSuccessHandler(res => { document.getElementById('dashTotal').innerText="Rp "+res.total.toLocaleString(); document.getElementById('dashCount').innerText=res.count; }).getDashboardStats(DB_ID); }
+    function loadDropdowns() { google.script.run.withSuccessHandler(res => { 
+        const t=document.getElementById('trxToko'), u=document.getElementById('trxUraian');
+        t.innerHTML='<option value="">Pilih...</option>'; u.innerHTML='<option value="">Pilih...</option>';
+        res.toko.forEach(x=>t.add(new Option(x,x))); res.uraian.forEach(x=>u.add(new Option(x,x)));
+    }).getDropdownData(DB_ID); }
+    
+    function addRow() { const tr=document.createElement('tr'); tr.innerHTML=`<td><input class="form-control form-control-sm i-nama"></td><td><input type="number" class="form-control form-control-sm i-vol" oninput="cR(this)"></td><td><input class="form-control form-control-sm i-sat"></td><td><input type="number" class="form-control form-control-sm i-harga" oninput="cR(this)"></td><td><input class="form-control form-control-sm i-total" readonly value="0"></td><td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove();cGT()">x</button></td>`; document.getElementById('trxBody').appendChild(tr); }
+    function cR(e) { const r=e.closest('tr'), v=r.querySelector('.i-vol').value||0, h=r.querySelector('.i-harga').value||0; r.querySelector('.i-total').value=v*h; cGT(); }
+    function cGT() { let t=0; document.querySelectorAll('.i-total').forEach(e=>t+=Number(e.value)); document.getElementById('grandTotal').innerText=t.toLocaleString(); }
+    function simpanTransaksi(e) { e.preventDefault(); const f=e.target, h={tanggal:f.tanggal.value, toko:f.toko.value, uraian:f.uraian.value, no_bukti:f.no_bukti.value}, it=[]; document.querySelectorAll('#trxBody tr').forEach(r=>{ it.push({nama:r.querySelector('.i-nama').value, vol:r.querySelector('.i-vol').value, sat:r.querySelector('.i-sat').value, harga:r.querySelector('.i-harga').value, total:r.querySelector('.i-total').value})}); if(it.length===0) return alert("Kosong"); loader(true); google.script.run.withSuccessHandler(r=>{ loader(false); alert(r); f.reset(); document.getElementById('trxBody').innerHTML=''; cGT(); addRow(); }).processTransaksiLengkap(DB_ID, h, it); }
+    
+    addRow();
+</script>
