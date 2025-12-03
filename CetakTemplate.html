@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    /* Reset & Page Setup */
+    @page { size: F4; margin: 0; }
+    body { 
+      font-family: 'Times New Roman', Times, serif; 
+      font-size: 12pt; 
+      color: #000; 
+      -webkit-print-color-adjust: exact; 
+      margin: 0; 
+      padding: 0; 
+    }
+    
+    .page {
+      width: 215mm; /* Lebar F4 */
+      min-height: 330mm; /* Tinggi F4 */
+      padding: 15mm 20mm; /* Margin atas/bawah kiri/kanan */
+      margin: auto;
+      background: white;
+      box-sizing: border-box;
+      position: relative;
+      page-break-after: always;
+    }
+    .page:last-child { page-break-after: avoid; }
+
+    /* --- GAYA KHUSUS HALAMAN 1 --- */
+    
+    /* Kop Surat Image Full */
+    .kop-img-container {
+      width: 100%;
+      text-align: center;
+      margin-bottom: 5px;
+    }
+    .kop-img {
+      width: 100%;
+      max-height: 150px;
+      object-fit: contain; /* Agar gambar tidak gepeng */
+    }
+    
+    /* Garis Tebal Bawah Kop */
+    .garis-kop {
+      border-bottom: 3px double #000; /* Garis ganda tebal */
+      margin-bottom: 15px;
+      width: 100%;
+    }
+
+    /* Meta Surat (Nomor, Hal, Lamp) */
+    .meta-table {
+      width: 100%;
+      font-size: 12pt;
+      margin-bottom: 20px;
+      border-collapse: collapse;
+    }
+    .meta-table td {
+      vertical-align: top;
+      padding: 1px 0;
+    }
+
+    /* Tujuan Surat (Kepada Yth) */
+    .tujuan-surat {
+      margin-left: 50%; /* Geser ke kanan separuh halaman */
+      width: 50%;
+      margin-bottom: 20px;
+    }
+
+    /* Tabel Barang (Tanpa Harga) */
+    .table-request { 
+      width: 100%; 
+      border-collapse: collapse; 
+      margin-top: 10px; 
+      margin-bottom: 10px; 
+      font-size: 11pt; 
+    }
+    .table-request th, .table-request td { 
+      border: 1px solid #000; 
+      padding: 4px 6px; 
+      vertical-align: middle; 
+    }
+    .table-request th { 
+      text-align: center; 
+      font-weight: bold; 
+      background-color: transparent; 
+      text-transform: uppercase;
+    }
+    
+    /* Helper Text */
+    .text-justify { text-align: justify; line-height: 1.3; }
+    .text-center { text-align: center; }
+    .text-bold { font-weight: bold; }
+    .text-underline { text-decoration: underline; }
+
+    /* Tanda Tangan */
+    .ttd-wrapper {
+      margin-top: 30px;
+      width: 100%;
+      display: flex;
+      justify-content: flex-end; /* Geser ke kanan */
+    }
+    .ttd-box {
+      width: 250px; /* Lebar area tanda tangan */
+      text-align: left; /* Sesuai gambar, rata kiri relatif terhadap box */
+    }
+    .ttd-space { height: 70px; }
+
+    /* --- GAYA UMUM HALAMAN LAIN (Default) --- */
+    .table-data { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11pt; }
+    .table-data th, .table-data td { border: 1px solid #000; padding: 5px; }
+    .text-right { text-align: right; }
+    .judul-halaman { text-align: center; font-weight: bold; font-size: 14pt; margin: 15px 0; text-transform: uppercase; text-decoration: underline; }
+    .kop-text-toko { text-align: center; font-weight: bold; font-size: 14pt; text-transform: uppercase; }
+    .kop-sub-toko { text-align: center; font-size: 11pt; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+
+  <div class="page">
+    
+    <div class="kop-img-container">
+      <? if (sekolah.kop_base64) { ?>
+        <img src="<?= sekolah.kop_base64 ?>" class="kop-img">
+      <? } else { ?>
+        <h2 style="margin:0"><?= sekolah.sekolah ?></h2>
+        <p style="margin:0"><?= sekolah.alamat ?></p>
+      <? } ?>
+    </div>
+    <div class="garis-kop"></div>
+
+    <table class="meta-table">
+      <tr>
+        <td width="60">Nomor</td>
+        <td width="10">:</td>
+        <td><?= nomor.keluar || "......................." ?></td>
+      </tr>
+      <tr>
+        <td>Hal</td>
+        <td>:</td>
+        <td class="text-bold"><?= trx.uraian ?></td>
+      </tr>
+      <tr>
+        <td>Lamp</td>
+        <td>:</td>
+        <td>-</td>
+      </tr>
+    </table>
+
+    <div class="tujuan-surat">
+      Kepada Yth. Pimp <b><?= trx.toko ?></b><br>
+      Di<br>
+      <div style="margin-top: 2px;">
+        <?= toko.alamat ?> 
+      </div>
+    </div>
+
+    <p>Assalamualaikum Wr. Wb.</p>
+    <p class="text-justify">
+      Sehubungan dengan adanya kegiatan <b><?= trx.uraian ?></b> di <b><?= sekolah.sekolah ?></b>, 
+      dengan ini kami memohon kiranya berkenan untuk menyediakan daftar barang dibawah pada tanggal 
+      <b><?= fmtDate(tanggal.periksa || trx.tanggal) ?></b> dengan perincian sebagai berikut:
+    </p>
+
+    <table class="table-request">
+      <thead>
+        <tr>
+          <th width="5%">No</th>
+          <th>JENIS BARANG</th>
+          <th width="15%">BANYAKNYA</th>
+          <th width="15%">SATUAN</th>
+        </tr>
+      </thead>
+      <tbody>
+        <? for(var i=0; i<items.length; i++) { ?>
+        <tr>
+          <td class="text-center"><?= i+1 ?></td>
+          <td><?= items[i].nama ?></td>
+          <td class="text-center"><?= items[i].vol ?></td>
+          <td class="text-center"><?= items[i].sat ?></td>
+        </tr>
+        <? } ?>
+        
+        <? for(var j=items.length; j<15; j++) { ?>
+        <tr>
+          <td class="text-center">&nbsp;</td>
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>
+        <? } ?>
+      </tbody>
+    </table>
+
+    <p style="margin-top: 15px;">Demikian yang menjadi penyampaian kami, atas kerja samanya kami ucapkan terima kasih.</p>
+    
+    <div class="ttd-wrapper">
+      <div class="ttd-box">
+        <?= sekolah.kota ?>, <?= fmtDate(nomor.tgl_surat_keluar || trx.tanggal) ?><br>
+        Hormat Kami,<br>
+        <div class="ttd-space"></div>
+        <b class="text-underline"><?= sekolah.bendahara ?></b>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="page">
+    <div class="text-center">
+      <div class="kop-text-toko"><?= trx.toko ?></div>
+      <div class="kop-sub-toko"><?= toko.alamat ?><br>Telp: <?= toko.telp ?></div>
+      <hr style="border-top: 2px solid #000;">
+    </div>
+    <br>
+    <table style="width: 100%;">
+      <tr><td>Hal : <b>Penawaran Harga</b></td><td class="text-right"><?= toko.kota ?>, <?= fmtDate(tanggal.masuk || trx.tanggal) ?></td></tr>
+    </table>
+    <br>
+    <p>Kepada Yth,<br>Kepala <?= sekolah.sekolah ?><br>Di -<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Tempat</p>
+    <p>Assalamualaikum Wr. Wb.</p>
+    <p class="text-justify">
+      Menindaklanjuti surat permintaan Saudara Nomor: <?= nomor.keluar || "......................." ?>, maka kami menawarkan barang/jasa tersebut dengan rincian harga sebagai berikut:
+    </p>
+    <table class="table-data">
+      <thead>
+        <tr><th width="5%">No</th><th>Jenis Barang</th><th width="10%">Vol</th><th>Satuan</th><th>Harga Satuan</th><th>Jumlah (Rp)</th></tr>
+      </thead>
+      <tbody>
+        <? for(var i=0; i<items.length; i++) { ?>
+        <tr>
+          <td class="text-center"><?= i+1 ?></td>
+          <td><?= items[i].nama ?></td>
+          <td class="text-center"><?= items[i].vol ?></td>
+          <td class="text-center"><?= items[i].sat ?></td>
+          <td class="text-right"><?= fmtRupiah(items[i].harga) ?></td>
+          <td class="text-right"><?= fmtRupiah(items[i].total) ?></td>
+        </tr>
+        <? } ?>
+        <tr>
+          <td colspan="5" class="text-center text-bold">TOTAL HARGA</td>
+          <td class="text-right text-bold"><?= fmtRupiah(trx.total_trx) ?></td>
+        </tr>
+      </tbody>
+    </table>
+    <p>Demikian penawaran ini kami ajukan. Terima kasih.</p>
+    <div class="ttd-wrapper">
+      <div class="ttd-box">
+        Hormat Kami,<br>
+        Pimpinan Toko<br>
+        <div class="ttd-space"></div>
+        <b><u><?= toko.pemilik ?></u></b>
+      </div>
+    </div>
+  </div>
+
+  <div class="page">
+    <div class="kop-img-container">
+      <? if (sekolah.kop_base64) { ?> <img src="<?= sekolah.kop_base64 ?>" class="kop-img"> <? } ?>
+    </div>
+    <div class="garis-kop"></div>
+    
+    <div class="judul-halaman">BERITA ACARA PEMERIKSAAN BARANG</div>
+    <div class="text-center">Nomor: <?= nomor.periksa || "......................." ?></div>
+    <br>
+    <p class="text-justify">
+      Pada hari ini <b><?= hari(tanggal.periksa || trx.tanggal) ?></b> tanggal <b><?= terbilangTanggal(tanggal.periksa || trx.tanggal) ?></b>, telah diadakan pemeriksaan terhadap pengadaan barang/jasa yang dipesan dari <b><?= trx.toko ?></b> sesuai Nota/Faktur Nomor: <?= nomor.masuk || "-" ?>.
+    </p>
+    <p>Hasil pemeriksaan adalah sebagai berikut:</p>
+    <table class="table-data">
+      <thead><tr><th>No</th><th>Nama Barang</th><th>Banyaknya</th><th>Harga Satuan</th><th>Jumlah Harga</th></tr></thead>
+      <tbody>
+        <? for(var i=0; i<items.length; i++) { ?>
+        <tr>
+          <td class="text-center"><?= i+1 ?></td>
+          <td><?= items[i].nama ?></td>
+          <td class="text-center"><?= items[i].vol ?> <?= items[i].sat ?></td>
+          <td class="text-right"><?= fmtRupiah(items[i].harga) ?></td>
+          <td class="text-right"><?= fmtRupiah(items[i].total) ?></td>
+        </tr>
+        <? } ?>
+        <tr><td colspan="4" class="text-center text-bold">TOTAL</td><td class="text-right text-bold"><?= fmtRupiah(trx.total_trx) ?></td></tr>
+      </tbody>
+    </table>
+    <p>Barang tersebut telah diperiksa dan dinyatakan <b>LENGKAP dan BAIK</b> sesuai pesanan.</p>
+    
+    <table style="width: 100%; margin-top: 30px;">
+      <tr>
+        <td class="text-center" width="50%">
+          Pimpinan Toko,<br><div class="ttd-space"></div>
+          <b><u><?= toko.pemilik ?></u></b>
+        </td>
+        <td class="text-center" width="50%">
+          Yang Memesan (Bendahara),<br><div class="ttd-space"></div>
+          <b><u><?= sekolah.bendahara ?></u></b><br>NIP. <?= sekolah.nip_bendahara ?>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="page">
+    <div class="text-center">
+      <div class="kop-text-toko"><?= trx.toko ?></div>
+      <hr style="border-top: 2px solid #000;">
+    </div>
+    <br>
+    <div class="judul-halaman">BERITA ACARA SERAH TERIMA BARANG</div>
+    <br>
+    <p>Pada hari ini <b><?= hari(tanggal.terima || trx.tanggal) ?></b> tanggal <b><?= terbilangTanggal(tanggal.terima || trx.tanggal) ?></b>, kami yang bertanda tangan dibawah ini:</p>
+    <table style="width: 100%; padding-left: 20px;">
+      <tr><td width="100">1. Nama</td><td>: <?= sekolah.kepsek ?></td></tr>
+      <tr><td>Jabatan</td><td>: Kepala Sekolah (Pihak Pertama)</td></tr>
+    </table>
+    <br>
+    <table style="width: 100%; padding-left: 20px;">
+      <tr><td width="100">2. Nama</td><td>: <?= toko.pemilik ?></td></tr>
+      <tr><td>Jabatan</td><td>: Pimpinan <?= trx.toko ?> (Pihak Kedua)</td></tr>
+    </table>
+    <br>
+    <p class="text-justify">
+      PIHAK KEDUA menyerahkan barang kepada PIHAK PERTAMA, dan PIHAK PERTAMA menerima barang tersebut dalam keadaan baik dan cukup sesuai dengan pesanan senilai <b><?= fmtRupiah(trx.total_trx) ?></b> (<?= terbilang(trx.total_trx) ?> Rupiah).
+    </p>
+    <table style="width: 100%; margin-top: 30px;">
+      <tr>
+        <td class="text-center" width="50%">
+          PIHAK KEDUA,<br><div class="ttd-space"></div>
+          <b><u><?= toko.pemilik ?></u></b>
+        </td>
+        <td class="text-center" width="50%">
+          PIHAK PERTAMA,<br><div class="ttd-space"></div>
+          <b><u><?= sekolah.kepsek ?></u></b><br>NIP. <?= sekolah.nip_kepsek ?>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="page">
+    <div class="text-center">
+      <div class="kop-text-toko"><?= trx.toko ?></div>
+      <div class="kop-sub-toko"><?= toko.alamat ?></div>
+      <hr style="border-top: 2px solid #000;">
+    </div>
+    <div class="text-center" style="font-size: 16pt; font-weight: bold; margin: 20px 0;">F A K T U R</div>
+    <div>Nomor: <?= nomor.masuk || "......................." ?></div>
+    <table class="table-data">
+      <thead><tr><th>No</th><th>Nama Barang</th><th>Qty</th><th>Satuan</th><th>Harga @</th><th>Total</th></tr></thead>
+      <tbody>
+        <? for(var i=0; i<items.length; i++) { ?>
+        <tr>
+          <td class="text-center"><?= i+1 ?></td>
+          <td><?= items[i].nama ?></td>
+          <td class="text-center"><?= items[i].vol ?></td>
+          <td class="text-center"><?= items[i].sat ?></td>
+          <td class="text-right"><?= fmtRupiah(items[i].harga) ?></td>
+          <td class="text-right"><?= fmtRupiah(items[i].total) ?></td>
+        </tr>
+        <? } ?>
+        <tr><td colspan="5" class="text-center text-bold">TOTAL TAGIHAN</td><td class="text-right text-bold"><?= fmtRupiah(trx.total_trx) ?></td></tr>
+      </tbody>
+    </table>
+    <div style="margin-top: 10px; font-style: italic;">Terbilang: # <?= terbilang(trx.total_trx) ?> Rupiah #</div>
+    <table style="width: 100%; margin-top: 30px;">
+      <tr>
+        <td class="text-center" width="50%">
+          Yang Menerima,<br><div class="ttd-space"></div>
+          <b><u><?= sekolah.kepsek ?></u></b>
+        </td>
+        <td class="text-center" width="50%">
+          Hormat Kami,<br><div class="ttd-space"></div>
+          <b><u><?= toko.pemilik ?></u></b>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="page">
+    <div class="kop-img-container">
+      <? if (sekolah.kop_base64) { ?> <img src="<?= sekolah.kop_base64 ?>" class="kop-img"> <? } ?>
+    </div>
+    <div class="garis-kop"></div>
+
+    <div class="judul-halaman">BERITA ACARA PEMBAYARAN</div>
+    <div class="text-center">Nomor: <?= nomor.bayar || "......................." ?></div>
+    <br>
+    <p class="text-justify">
+      Pada hari ini <b><?= hari(tanggal.bayar || trx.tanggal) ?></b> tanggal <b><?= terbilangTanggal(tanggal.bayar || trx.tanggal) ?></b>, kami yang bertanda tangan dibawah ini:
+    </p>
+    <table style="width: 100%; padding-left: 20px;">
+      <tr><td width="100">1. Nama</td><td>: <?= sekolah.kepsek ?></td></tr>
+      <tr><td>Jabatan</td><td>: Kepala Sekolah (Pihak Pertama)</td></tr>
+    </table>
+    <br>
+    <table style="width: 100%; padding-left: 20px;">
+      <tr><td width="100">2. Nama</td><td>: <?= toko.pemilik ?></td></tr>
+      <tr><td>Jabatan</td><td>: Pimpinan <?= trx.toko ?> (Pihak Kedua)</td></tr>
+    </table>
+    <p class="text-justify">
+      PIHAK PERTAMA telah membayar lunas kepada PIHAK KEDUA sebesar <b><?= fmtRupiah(trx.total_trx) ?></b> untuk pelunasan barang sesuai Berita Acara Pemeriksaan Barang Nomor: <?= nomor.periksa || "-" ?>.
+    </p>
+    <p>Rincian Pembayaran:</p>
+    <table style="width: 100%; margin-left: 20px;">
+      <tr><td width="200">Jumlah Harga Borongan</td><td>: <?= fmtRupiah(trx.total_trx) ?></td></tr>
+      <tr><td>Sisa yang belum dibayar</td><td>: NIHIL</td></tr>
+      <tr><td><b>Jumlah yang dibayarkan</b></td><td>: <b><?= fmtRupiah(trx.total_trx) ?></b></td></tr>
+    </table>
+    <table style="width: 100%; margin-top: 30px;">
+      <tr>
+        <td class="text-center" width="50%">
+          Penerima (Pihak Kedua),<br><div class="ttd-space"></div>
+          <b><u><?= toko.pemilik ?></u></b>
+        </td>
+        <td class="text-center" width="50%">
+          Pembayar (Pihak Pertama),<br><div class="ttd-space"></div>
+          <b><u><?= sekolah.kepsek ?></u></b><br>NIP. <?= sekolah.nip_kepsek ?>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="page">
+    <div class="judul-halaman" style="margin-top: 50px;">KWITANSI / BUKTI PEMBAYARAN</div>
+    <br>
+    <table>
+      <tr><td width="100">Tahun Anggaran</td><td>: <?= new Date().getFullYear() ?></td></tr>
+      <tr><td>No. Bukti</td><td>: <?= nomor.bayar || "......................." ?></td></tr>
+    </table>
+    
+    <div style="border: 2px solid #000; padding: 10px; margin-top: 20px;">
+      <table style="width: 100%; line-height: 2;">
+        <tr><td width="150">Sudah Terima Dari</td><td>: Kepala <?= sekolah.sekolah ?></td></tr>
+        <tr><td>Jumlah Uang</td><td>: <span style="font-weight: bold; font-size: 14pt; background: #eee; padding: 2px 10px;"><?= fmtRupiah(trx.total_trx) ?></span></td></tr>
+        <tr><td>Terbilang</td><td>: <i style="text-transform: capitalize; background: #eee; padding: 2px 10px;"><?= terbilang(trx.total_trx) ?> Rupiah</i></td></tr>
+        <tr><td>Untuk Pembayaran</td><td>: <?= trx.uraian ?></td></tr>
+      </table>
+    </div>
+
+    <table style="width: 100%; margin-top: 30px;">
+      <tr>
+        <td class="text-center" style="vertical-align: top;">
+          Lunas Dibayar Tanggal: <?= fmtDate(tanggal.bayar || trx.tanggal) ?><br>
+          Bendahara BOS,<br><div class="ttd-space"></div>
+          <b><u><?= sekolah.bendahara ?></u></b><br>NIP. <?= sekolah.nip_bendahara ?>
+        </td>
+        <td class="text-center" style="vertical-align: top;">
+          <?= sekolah.kota ?>, <?= fmtDate(tanggal.bayar || trx.tanggal) ?><br>
+          Penerima Uang,<br><div class="ttd-space"></div>
+          <b><u><?= toko.pemilik ?></u></b>
+        </td>
+      </tr>
+    </table>
+    
+    <div class="text-center" style="margin-top: 40px;">
+      Mengetahui,<br>Kepala Sekolah<br><div class="ttd-space"></div>
+      <b><u><?= sekolah.kepsek ?></u></b><br>NIP. <?= sekolah.nip_kepsek ?>
+    </div>
+  </div>
+
+</body>
+</html>
