@@ -413,8 +413,12 @@
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td width="100">${trx.tanggal}</td>
-                    <td>${trx.toko}</td>
-                    <td>${trx.uraian}</td>
+                    <td>
+                        <div class="info-scroll">${trx.toko}</div>
+                    </td>
+                    <td>
+                        <div class="info-scroll">${trx.uraian}</div>
+                    </td>
                     <td>
                         <div class="detail-scroll">
                             ${itemStr}
