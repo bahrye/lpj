@@ -78,16 +78,38 @@ function saveDataSekolah(dbId, formObj) {
   return "Data Sekolah Berhasil Disimpan!";
 }
 
-// CRUD MASTER
 function getAllMasterData(dbId, sheetName) {
   try {
     const ss = SpreadsheetApp.openById(dbId);
     const sheet = ensureSheetExists(ss, sheetName);
     const lr = sheet.getLastRow();
     if (lr <= 1) return [];
-    // Mengembalikan data mentah (termasuk Object Date)
-    return sheet.getRange(2, 1, lr - 1, sheet.getLastColumn()).getValues(); 
-  } catch (e) { return []; }
+    
+    // Ambil semua data
+    let data = sheet.getRange(2, 1, lr - 1, sheet.getLastColumn()).getValues();
+    
+    // --- PERBAIKAN: KONVERSI TANGGAL ---
+    // Loop setiap baris dan cell untuk cek apakah ada data Tanggal
+    // Jika ada, ubah jadi String ISO (yyyy-mm-dd) agar aman dikirim
+    data = data.map(row => {
+      return row.map(cell => {
+        if (Object.prototype.toString.call(cell) === '[object Date]') {
+          try {
+            return cell.toISOString().split('T')[0]; // Mengambil bagian tanggal saja
+          } catch (e) {
+            return ""; // Jika error tanggal, kembalikan kosong
+          }
+        }
+        return cell;
+      });
+    });
+    // ------------------------------------
+
+    return data; 
+  } catch (e) { 
+    // Log error jika perlu: console.log(e);
+    return []; 
+  }
 }
 
 function saveMasterData(dbId, sheetName, dataArray, rowIndex) {
