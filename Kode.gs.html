@@ -131,10 +131,15 @@ function getDropdownData(dbId) {
     const ss = SpreadsheetApp.openById(dbId);
     const sToko = ensureSheetExists(ss, "Data_Toko");
     const sUraian = ensureSheetExists(ss, "Data_Uraian");
+    const sTukang = ensureSheetExists(ss, "Data_Tukang"); // UPDATE: Ambil sheet Tukang
+
     const dataToko = sToko.getLastRow() > 1 ? sToko.getRange(2, 1, sToko.getLastRow()-1, 1).getValues().flat() : [];
     const dataUraian = sUraian.getLastRow() > 1 ? sUraian.getRange(2, 2, sUraian.getLastRow()-1, 1).getValues().flat() : [];
-    return { toko: dataToko, uraian: dataUraian };
-  } catch (e) { return { toko: [], uraian: [] }; }
+    const dataTukang = sTukang.getLastRow() > 1 ? sTukang.getRange(2, 1, sTukang.getLastRow()-1, 1).getValues().flat() : []; // UPDATE: Ambil data Tukang
+
+    // UPDATE: Return dataTukang juga
+    return { toko: dataToko, uraian: dataUraian, tukang: dataTukang }; 
+  } catch (e) { return { toko: [], uraian: [], tukang: [] }; }
 }
 
 function processTransaksiLengkap(dbId, header, items) {
@@ -157,7 +162,6 @@ function getDashboardStats(dbId) {
     const sSekolah = ss.getSheetByName("Data_Sekolah");
     if (sSekolah) {
       const dataSekolah = sSekolah.getDataRange().getValues();
-      // Cari baris dengan kunci 'total_anggaran'
       const rowAnggaran = dataSekolah.find(r => r[0] === 'total_anggaran');
       if (rowAnggaran) totalAnggaran = Number(rowAnggaran[1] || 0);
     }
@@ -168,35 +172,29 @@ function getDashboardStats(dbId) {
   const lr = sTrx.getLastRow();
   
   let totalBelanja = 0;
-  let uniqueIds = new Set(); // Untuk menyimpan ID unik
+  let uniqueIds = new Set(); 
   
   if (lr > 1) {
-    // Ambil kolom ID (indeks 0) dan Total (indeks 8)
-    // Range: Baris 2, Kolom 1 (A), Sampai Akhir, Ambil 9 kolom (A-I)
-    // ID di index 0, Total di index 8
     const values = sTrx.getRange(2, 1, lr - 1, 9).getValues(); 
     
     values.forEach(v => {
-      const id = v[0];     // Kolom A
-      const total = Number(v[8] || 0); // Kolom I
+      const id = v[0];     
+      const total = Number(v[8] || 0); 
       
-      if(id) uniqueIds.add(id); // Masukkan ID ke Set (otomatis unik)
+      if(id) uniqueIds.add(id); 
       totalBelanja += total;
     });
   }
   
-  // 3. Hitung Sisa
   const sisa = totalAnggaran - totalBelanja;
 
   return {
     anggaran: totalAnggaran,
     belanja: totalBelanja,
     sisa: sisa,
-    count: uniqueIds.size // Jumlah ID unik
+    count: uniqueIds.size 
   };
 }
-
-// --- FUNGSI RIWAYAT & AKSI ---
 
 function getRiwayatTransaksiGrouped(dbId) {
   try {
@@ -204,15 +202,10 @@ function getRiwayatTransaksiGrouped(dbId) {
     const lr = ss.getLastRow();
     if (lr <= 1) return [];
 
-    // Ambil data (Max 100 baris terakhir agar tidak berat, atau ambil semua jika perlu)
-    // Disini kita ambil semua data dulu untuk grouping yang akurat, 
-    // tapi jika data ribuan sebaiknya dilimit.
     const data = ss.getRange(2, 1, lr - 1, 10).getValues(); 
     
-    // Grouping berdasarkan ID Transaksi (Kolom Indeks 0)
     let grouped = {};
     
-    // Loop dari bawah ke atas agar data terbaru muncul duluan di Object
     for(let i = data.length - 1; i >= 0; i--) {
         let row = data[i];
         let id = row[0];
@@ -244,10 +237,7 @@ function getRiwayatTransaksiGrouped(dbId) {
         
         grouped[id].total_trx += Number(row[8] || 0);
     }
-    
-    // Convert Object ke Array
     return Object.values(grouped);
-    
   } catch (e) {
     return [];
   }
@@ -258,7 +248,6 @@ function deleteTransaksiById(dbId, idTrx) {
     const data = ss.getDataRange().getValues();
     let deletedCount = 0;
     
-    // Loop dari bawah ke atas untuk delete row aman
     for (let i = data.length - 1; i >= 1; i--) {
         if (data[i][0] == idTrx) {
             ss.deleteRow(i + 1);
