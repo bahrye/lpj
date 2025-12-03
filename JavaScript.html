@@ -434,27 +434,75 @@
         const reader = new FileReader();
         
         reader.onload = function(e) {
+            // Kita ambil base64 murni (tanpa prefix data:image...) untuk dikirim ke server
             const content = e.target.result.split(',')[1]; 
+            
             google.script.run.withSuccessHandler(res => {
                 loader(false);
-                if(res.status === 'success') alert("Kop Surat berhasil disimpan ke Database!");
-                else alert("Gagal: " + res.message);
+                if(res.status === 'success') {
+                    alert("Kop Surat berhasil disimpan ke Database!");
+                    
+                    // UPDATE CACHE & TAMPILAN LANGSUNG (PENTING)
+                    // res.url berisi string data:image lengkap dari server
+                    try {
+                        localStorage.setItem('bos_kop_image', res.url);
+                    } catch (e) {
+                        console.log("Gagal update cache lokal");
+                    }
+                    
+                    document.getElementById('previewImgKop').src = res.url;
+                    document.getElementById('previewImgKop').style.display = 'block';
+                    document.getElementById('noKopText').style.display = 'none';
+                    
+                } else {
+                    alert("Gagal: " + res.message);
+                }
             }).saveKopSuratToDrive(DB_ID, content, file.type, SEKOLAH_NAMA);
         };
         reader.readAsDataURL(file);
     }
 
     function loadExistingKop() {
+        const img = document.getElementById('previewImgKop');
+        const txt = document.getElementById('noKopText');
+        
+        // 1. CEK CACHE LOKAL (Agar Instan)
+        const cachedKop = localStorage.getItem('bos_kop_image');
+        
+        if (cachedKop) {
+            img.src = cachedKop;
+            img.style.display = 'block';
+            txt.style.display = 'none';
+        }
+
+        // 2. TETAP PANGGIL SERVER (Background Check)
+        // Gunanya untuk memastikan jika ada perubahan data di device lain,
+        // atau jika cache belum ada.
         google.script.run.withSuccessHandler(url => {
-            // Karena server sekarang mengirim string "data:image/png;base64,....."
-            // Maka src akan langsung mengenali gambar tersebut.
             if(url) {
-                document.getElementById('previewImgKop').src = url;
-                document.getElementById('previewImgKop').style.display = 'block';
-                document.getElementById('noKopText').style.display = 'none';
+                // Jika URL dari server berbeda dengan cache (atau cache kosong), update!
+                if (url !== cachedKop) {
+                    img.src = url;
+                    img.style.display = 'block';
+                    txt.style.display = 'none';
+                    
+                    // Simpan ke localStorage
+                    try {
+                        localStorage.setItem('bos_kop_image', url);
+                    } catch (e) {
+                        console.log("Storage penuh, gagal cache gambar.");
+                    }
+                }
             } else {
-                document.getElementById('previewImgKop').style.display = 'none';
-                document.getElementById('noKopText').style.display = 'block';
+                // Jika di server tidak ada gambar (dihapus), reset tampilan & cache
+                if (cachedKop) {
+                    localStorage.removeItem('bos_kop_image');
+                    img.style.display = 'none';
+                    txt.style.display = 'block';
+                } else {
+                    img.style.display = 'none';
+                    txt.style.display = 'block';
+                }
             }
         }).getKopSuratUrl(DB_ID);
     }
