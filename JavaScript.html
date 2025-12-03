@@ -169,8 +169,25 @@
     }
 
     function simpanSekolah(e) { 
-        e.preventDefault(); loader(true); 
-        google.script.run.withSuccessHandler(res => { loader(false); showAlert(res, 'success'); }).saveDataSekolah(DB_ID, Object.fromEntries(new FormData(e.target))); 
+        e.preventDefault(); 
+        loader(true); 
+        
+        // Ambil data form
+        const formData = new FormData(e.target);
+        const dataObj = Object.fromEntries(formData);
+
+        // FIX: Tambahkan petik satu pada NIP agar tidak terformat angka
+        if (dataObj.nip_kepsek && !dataObj.nip_kepsek.startsWith("'")) {
+            dataObj.nip_kepsek = "'" + dataObj.nip_kepsek;
+        }
+        if (dataObj.nip_bendahara && !dataObj.nip_bendahara.startsWith("'")) {
+            dataObj.nip_bendahara = "'" + dataObj.nip_bendahara;
+        }
+
+        google.script.run.withSuccessHandler(res => { 
+            loader(false); 
+            showAlert(res, 'success'); 
+        }).saveDataSekolah(DB_ID, dataObj); // Kirim object yang sudah dimodifikasi
     }
 
     // ==========================================
@@ -207,18 +224,31 @@
         else if (type === 'Data_Tukang') {
             data = [f.nama.value, f.alamat.value]; 
         }
+        // Di dalam fungsi simpanMaster(e, type) ...
         else if (type === 'Data_Toko') { 
-            // PERUBAHAN: Field ke-6 sekarang adalah "Tempat TTD" (Teks biasa)
-            // Bukan lagi tanggal yang perlu diformat ISO
+            
+            // --- LOGIKA BARU JENIS TOKO ---
+            let jenisFinal = f.jenis.value;
+            if (jenisFinal === 'Lainnya') {
+                jenisFinal = document.getElementById('t_jenis_manual').value;
+            }
+            // ------------------------------
+
+            // Logika No Telp (dari perbaikan sebelumnya)
+            let noTelp = f.telp.value;
+            if (noTelp && String(noTelp).trim() !== "" && !noTelp.startsWith("'")) {
+                noTelp = "'" + noTelp;
+            }
+
             data = [
                 f.nama.value, 
-                f.jenis.value, 
+                jenisFinal,      // Gunakan variabel yang sudah dihitung di atas
                 f.alamat.value, 
-                f.telp.value,     // No Telp (Text)
+                noTelp, 
                 f.pemilik.value, 
-                f.tempat.value    // Tempat TTD (Text)
+                f.tempat.value
             ]; 
-        } 
+        }
         
         google.script.run.withSuccessHandler(res => { 
             loader(false); 
@@ -245,14 +275,42 @@
             document.getElementById('k_nama').value = d[0]; 
             document.getElementById('k_alamat').value = d[1]; 
         } 
+        // Di dalam fungsi editMaster(type, index) ...
         else if (type === 'Data_Toko') { 
             document.getElementById('t_nama').value = d[0]; 
-            document.getElementById('t_jenis').value = d[1]; 
-            document.getElementById('t_alamat').value = d[2]; 
-            document.getElementById('t_telp').value = d[3]; 
-            document.getElementById('t_pemilik').value = d[4]; 
             
-            // PERUBAHAN: Load data Tempat TTD (index ke-5) sebagai teks biasa
+            // --- LOGIKA LOAD JENIS TOKO ---
+            const valJenis = d[1];
+            const select = document.getElementById('t_jenis');
+            const container = document.getElementById('div_jenis_manual'); // UPDATE INI
+            const manualInput = document.getElementById('t_jenis_manual');
+            
+            let adaDiOpsi = false;
+            for (let i = 0; i < select.options.length; i++) {
+                if (select.options[i].value === valJenis) {
+                    adaDiOpsi = true;
+                    break;
+                }
+            }
+
+            if (adaDiOpsi) {
+                select.value = valJenis;
+                container.classList.add('hidden'); // Sembunyikan container
+            } else {
+                select.value = 'Lainnya';
+                container.classList.remove('hidden'); // Munculkan container
+                manualInput.value = valJenis;
+            }
+            // ------------------------------
+
+            document.getElementById('t_alamat').value = d[2]; 
+            
+            // Bersihkan tanda kutip untuk tampilan (Logika No Telp)
+            let telpView = d[3] ? String(d[3]) : "";
+            if (telpView.startsWith("'")) telpView = telpView.substring(1);
+            document.getElementById('t_telp').value = telpView; 
+            
+            document.getElementById('t_pemilik').value = d[4]; 
             document.getElementById('t_tempat').value = d[5] || ""; 
         } 
     }
@@ -278,8 +336,12 @@
             document.getElementById('k_nama').value = ""; 
             document.getElementById('k_alamat').value = ""; 
         } 
+        // Di dalam fungsi resetFormMaster(type) ...
         if (type === 'Data_Toko') { 
-            // PERUBAHAN: Reset field t_tempat
+            // Reset field manual juga
+            document.getElementById('t_jenis_manual').value = "";
+            document.getElementById('div_jenis_manual').classList.add('hidden');
+
             ['t_nama','t_jenis','t_alamat','t_telp','t_pemilik','t_tempat'].forEach(id => {
                 const el = document.getElementById(id);
                 if(el) el.value = ""; 
@@ -480,6 +542,22 @@
     function renderTableTanggal(trxList, tanggalMap) { const tbody = document.getElementById('tbody_setting_tanggal'); tbody.innerHTML = ''; if (!trxList || trxList.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center">Belum ada transaksi.</td></tr>'; return; } trxList.forEach(trx => { const id = trx.id; const saved = tanggalMap[id]; let statusBadge = '<span class="badge bg-danger">Belum Diisi</span>'; if (saved && saved.bayar) statusBadge = '<span class="badge bg-success">Sudah Diisi</span>'; const tr = document.createElement('tr'); tr.innerHTML = `<td>${trx.tanggal}</td><td>${trx.toko}</td><td>${trx.uraian}</td><td class="text-center">${statusBadge}</td><td class="text-center"><button class="btn btn-warning btn-sm" onclick="openModalTanggal('${id}', '${trx.toko}')"><i class="fas fa-calendar-day"></i> Set Tanggal</button></td>`; tbody.appendChild(tr); }); }
     function openModalTanggal(trxId, pihakName) { document.getElementById('formTanggalSurat').reset(); document.getElementById('ts_id_trx').value = trxId; let isTukang = (CACHE_DROPDOWNS.tukang && CACHE_DROPDOWNS.tukang.includes(pihakName)); document.getElementById('ts_jenis_pihak').value = isTukang ? 'tukang' : 'toko'; const inputTglMasuk = document.getElementById('ts_masuk'); if (isTukang) { inputTglMasuk.disabled = true; inputTglMasuk.value = ""; document.getElementById('lbl_ts_periksa').innerText = "Pekerjaan"; document.getElementById('lbl_ts_terima').innerText = "Pekerjaan"; } else { inputTglMasuk.disabled = false; document.getElementById('lbl_ts_periksa').innerText = "Barang"; document.getElementById('lbl_ts_terima').innerText = "Barang"; } const saved = CACHE_TANGGAL_SURAT[trxId]; if (saved) { if (!isTukang) document.getElementById('ts_masuk').value = saved.masuk || ''; document.getElementById('ts_periksa').value = saved.periksa || ''; document.getElementById('ts_terima').value = saved.terima || ''; document.getElementById('ts_bayar').value = saved.bayar || ''; } new bootstrap.Modal(document.getElementById('modalTanggalSurat')).show(); }
     function simpanTanggalSurat(e) { e.preventDefault(); loader(true); const f = e.target; const data = { id_trx: f.id_trx.value, tgl_masuk: f.tgl_masuk.value, tgl_periksa: f.tgl_periksa.value, tgl_terima: f.tgl_terima.value, tgl_bayar: f.tgl_bayar.value }; google.script.run.withSuccessHandler(res => { loader(false); bootstrap.Modal.getInstance(document.getElementById('modalTanggalSurat')).hide(); loadPengaturanTanggal(); showAlert(res, 'success'); }).saveTanggalSuratData(DB_ID, data); }
+
+    function toggleJenisLainnya() {
+        const select = document.getElementById('t_jenis');
+        const container = document.getElementById('div_jenis_manual'); // Ambil Div pembungkus
+        const manualInput = document.getElementById('t_jenis_manual'); // Ambil Inputnya
+        
+        if (select.value === 'Lainnya') {
+            container.classList.remove('hidden'); // Munculkan pembungkusnya
+            manualInput.setAttribute('required', 'true');
+            manualInput.focus();
+        } else {
+            container.classList.add('hidden'); // Sembunyikan pembungkusnya
+            manualInput.removeAttribute('required');
+            manualInput.value = ''; 
+        }
+    }
     
     // Init Empty Row
     addRow();
