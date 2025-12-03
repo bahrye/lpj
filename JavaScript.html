@@ -124,9 +124,19 @@
             if (res.status === 'success') { 
                 DB_ID = res.token; 
                 SEKOLAH_NAMA = res.sekolah; 
+                
+                // --- SIMPAN DATA SESI ---
                 localStorage.setItem('bos_db_id', DB_ID); 
-                localStorage.setItem('bos_sekolah_nama', SEKOLAH_NAMA); 
+                localStorage.setItem('bos_sekolah_nama', SEKOLAH_NAMA);
+                
+                // Simpan Session Token
+                localStorage.setItem('bos_session_token', res.session_token); 
+                
                 initDashboard(); 
+                
+                // Jalankan Monitor Sesi Segera
+                startSessionMonitor();
+                
             } else { showAlert(res.message, 'danger'); } 
         }).loginUser(formData); 
     }
@@ -144,6 +154,53 @@
         document.getElementById('displaySekolah').innerText = SEKOLAH_NAMA; 
         toggleSidebar(); 
         openView('dashboard'); 
+    }
+
+    // ==========================================
+    // SESSION MANAGER (ANTI LOGIN GANDA)
+    // ==========================================
+    let sessionInterval = null;
+
+    function startSessionMonitor() {
+        // Hentikan interval lama jika ada
+        if (sessionInterval) clearInterval(sessionInterval);
+
+        // Jalankan pengecekan setiap 10 detik (10000 ms)
+        sessionInterval = setInterval(function() {
+            checkSessionValidity();
+        }, 10000); 
+    }
+
+    function checkSessionValidity() {
+        // Ambil ID dan Token dari LocalStorage
+        const localDbId = localStorage.getItem('bos_db_id');
+        const localToken = localStorage.getItem('bos_session_token');
+
+        // Jika tidak ada data login, tidak perlu cek (atau stop monitor)
+        if (!localDbId || !localToken) return;
+
+        google.script.run.withSuccessHandler(res => {
+            if (!res.isValid) {
+                // --- JIKA SESI TIDAK VALID (Login Ganda Terdeteksi) ---
+                
+                // 1. Hentikan Monitor
+                clearInterval(sessionInterval);
+                
+                // 2. Hapus Data Lokal
+                localStorage.clear();
+                
+                // 3. Tampilkan Pesan Keras (Alert)
+                alert("PERINGATAN KEAMANAN:\n\n" + res.message + "\n\nSesi Anda di perangkat ini akan ditutup.");
+                
+                // 4. Reload Halaman ke Login
+                location.reload();
+            }
+        }).checkSessionStatus(localDbId, localToken);
+    }
+    
+    // Panggil fungsi ini saat halaman dimuat ulang (jika sudah login)
+    if (DB_ID) {
+        startSessionMonitor();
     }
 
     // ==========================================
