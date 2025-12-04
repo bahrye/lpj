@@ -14,9 +14,37 @@
     
     let confirmCallback = null; // Untuk Modal Konfirmasi
 
-    if (DB_ID) { 
-        initDashboard(); 
+    if (DB_ID && localStorage.getItem('bos_session_token')) {
+        // Jangan langsung initDashboard. Cek validitas sesi dulu ke server.
+        loader(true); // Tampilkan loading agar user tahu proses sedang berjalan
+        
+        google.script.run
+            .withSuccessHandler(function(res) {
+                if (res.isValid) {
+                    // Sesi Valid: Baru jalankan dashboard dan monitor
+                    loader(false);
+                    initDashboard();
+                    startSessionMonitor(); 
+                } else {
+                    // Sesi Tidak Valid / Expired / Server Error
+                    localStorage.clear(); // Bersihkan data lokal yang bikin error
+                    loader(false);
+                    document.getElementById('authContainer').classList.remove('hidden');
+                    // Opsional: Tampilkan pesan kenapa logout
+                    // showAlert("Sesi berakhir, silakan login ulang.", "warning");
+                }
+            })
+            .withFailureHandler(function(err) {
+                // Jika server gagal dihubungi saat startup
+                console.error("Gagal startup:", err);
+                localStorage.clear();
+                loader(false);
+                document.getElementById('authContainer').classList.remove('hidden');
+            })
+            .checkSessionStatus(DB_ID, localStorage.getItem('bos_session_token'));
+            
     } else { 
+        // Tidak ada data login tersimpan
         document.getElementById('authContainer').classList.remove('hidden'); 
     }
 
@@ -196,11 +224,6 @@
                 location.reload();
             }
         }).checkSessionStatus(localDbId, localToken);
-    }
-    
-    // Panggil fungsi ini saat halaman dimuat ulang (jika sudah login)
-    if (DB_ID) {
-        startSessionMonitor();
     }
 
     // ==========================================
