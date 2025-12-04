@@ -295,8 +295,8 @@
                                 <form onsubmit="simpanMaster(event, 'Data_Uraian')">
                                     <input type="hidden" name="rowIndex" id="idx_Data_Uraian">
                                     <div class="mb-3">
-                                        <label class="form-label fw-bold">Kode Rekening</label>
-                                        <input type="text" name="kode" id="u_kode" class="form-control" placeholder="Contoh: 5.1.02...">
+                                        <label class="form-label fw-bold">Nomor Bukti</label>
+                                        <input type="text" name="kode" id="u_kode" class="form-control" placeholder="Contoh: 001/BOS/....">
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label fw-bold">Nama Uraian</label>
@@ -314,7 +314,7 @@
                         <div class="master-table-scroll">
                             <table class="table table-striped table-hover mb-0">
                                 <thead class="table-primary text-white">
-                                    <tr><th>Kode</th><th>Nama Uraian</th><th style="width:100px;">Aksi</th></tr>
+                                    <tr><th>No. Bukti</th><th>Nama Uraian</th><th style="width:100px;">Aksi</th></tr>
                                 </thead>
                                 <tbody id="tbody_Data_Uraian"></tbody>
                             </table>
@@ -623,6 +623,38 @@
           <button type="button" class="btn btn-danger" id="btnYaKonfirmasi">Ya, Lanjutkan</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalPilihCetak" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered"> 
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-print"></i> Opsi Cetak</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="cetak_id_trx"> <div class="mb-3">
+                    <label class="form-label fw-bold small text-muted">Pilih Dokumen yang Dicetak:</label>
+                    <select id="cetak_jenis" class="form-select">
+                        <option value="all" selected>Semua (Lengkap 7 Hal)</option>
+                        <option value="1">1. Surat Permintaan</option>
+                        <option value="2">2. Surat Penawaran</option>
+                        <option value="3">3. BA Pemeriksaan</option>
+                        <option value="4">4. BA Serah Terima</option>
+                        <option value="5">5. Faktur / Nota</option>
+                        <option value="6">6. BA Pembayaran</option>
+                        <option value="7">7. Kwitansi</option>
+                    </select>
+                </div>
+                
+                <div class="d-grid">
+                    <button type="button" class="btn btn-danger fw-bold" onclick="prosesCetakPDF()">
+                        <i class="fas fa-file-pdf"></i> DOWNLOAD PDF
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
   </div>
 
