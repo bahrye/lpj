@@ -2,7 +2,6 @@
     <div class="kop-img-container" style="text-align: center; margin-bottom: 10px;">
       <? if (sekolah.kop_base64) { ?>
           <img src="<?!= sekolah.kop_base64 ?>" style="width: 100%; max-height: 200px; object-fit: contain;">
-          
       <? } else { ?>
           <table style="width: 100%; border: none;">
             <tr>
@@ -71,10 +70,11 @@
         <? } ?>
         
         <? 
-           var minRows = 8; 
+           // UBAH: Kurangi minRows dari 8 menjadi 5 agar tidak mendorong TTD ke halaman baru
+           var minRows = 5; 
            var dataCount = items.length;
            var emptyRowsNeeded = minRows - dataCount;
-           if (emptyRowsNeeded < 0) emptyRowsNeeded = 0; // Jika data lebih dari 8, tidak perlu baris kosong
+           if (emptyRowsNeeded < 0) emptyRowsNeeded = 0; 
         ?>
         
         <? for(var j=0; j<emptyRowsNeeded; j++) { ?>
