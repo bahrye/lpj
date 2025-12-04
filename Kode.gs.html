@@ -168,13 +168,12 @@ function loginUser(form) {
   const data = ssMaster.getDataRange().getValues();
   
   for (let i = 1; i < data.length; i++) {
-    // Cek Email & Password (sesuai logika Anda sebelumnya)
     let isMatch = false;
     let dbId = "";
     let sekolahNama = "";
-    let rowIndex = i + 1; // Baris di spreadsheet (1-based)
+    let rowIndex = i + 1; 
 
-    // Logika pencocokan (Support format lama & baru sesuai kode Anda)
+    // Logika pencocokan (sesuaikan dengan kode lama Anda)
     if (data[i].length >= 6) { 
        if (data[i][3] == form.email && data[i][4] == form.password) {
          isMatch = true;
@@ -188,20 +187,19 @@ function loginUser(form) {
     }
 
     if (isMatch) {
-      // --- LOGIKA SESI BARU DI SINI ---
-      // 1. Buat Token Unik Baru
       const sessionToken = Utilities.getUuid();
+      const now = new Date(); // Waktu sekarang
       
-      // 2. Simpan Token ke Kolom G (Kolom 7) di baris user tersebut
-      // Pastikan kolom G tersedia, jika tidak script akan menambahkannya
-      ssMaster.getRange(rowIndex, 7).setValue(sessionToken);
+      // PERUBAHAN DISINI:
+      // Simpan Token di Kolom G (7) DAN Waktu Login di Kolom H (8)
+      // getRange(row, column, numRows, numColumns)
+      ssMaster.getRange(rowIndex, 7, 1, 2).setValues([[sessionToken, now]]);
 
-      // 3. Kembalikan token ke Client
       return { 
         status: "success", 
         token: dbId, 
         sekolah: sekolahNama,
-        session_token: sessionToken // Kirim token baru
+        session_token: sessionToken 
       }; 
     }
   }
@@ -209,31 +207,48 @@ function loginUser(form) {
   return { status: "error", message: "Email atau Password salah!" };
 }
 
-// --- FUNGSI CEK SESI (Kode.gs) ---
+// --- FUNGSI CEK SESI DENGAN TIMEOUT 3 JAM (Kode.gs) ---
 function checkSessionStatus(dbId, clientToken) {
+  // Konfigurasi Durasi Timeout (3 Jam dalam milidetik)
+  // 3 jam * 60 menit * 60 detik * 1000 milidetik
+  const MAX_IDLE_TIME = 3 * 60 * 60 * 1000; 
+
   try {
     const ssMaster = SpreadsheetApp.openById(ID_DB_MASTER).getSheetByName("Users");
     const data = ssMaster.getDataRange().getValues();
     
-    // Cari user berdasarkan dbId (ID Database Unik User)
-    // Kita asumsikan dbId unik per user.
     for (let i = 1; i < data.length; i++) {
-      // Cek kolom dbId (index 5 untuk format baru, index 4 format lama)
       let rowDbId = (data[i].length >= 6) ? data[i][5] : data[i][4];
       
       if (rowDbId === dbId) {
-        // Ambil token yang tersimpan di server (Kolom G / Index 6)
         const serverToken = (data[i].length >= 7) ? data[i][6] : "";
         
-        // Bandingkan token client dengan token server
+        // Ambil waktu terakhir aktif dari Kolom H (Index 7)
+        // Jika kosong (user lama), anggap waktu sekarang agar tidak langsung logout
+        let lastActive = (data[i].length >= 8 && data[i][7] instanceof Date) ? data[i][7] : new Date();
+        
         if (serverToken === clientToken) {
-          return { isValid: true };
+          const now = new Date();
+          const diff = now.getTime() - lastActive.getTime();
+
+          // Cek apakah selisih waktu melebihi 3 jam
+          if (diff > MAX_IDLE_TIME) {
+            // --- SESI KADALUWARSA ---
+            // Hapus Token (Kolom G) dan Waktu (Kolom H)
+            ssMaster.getRange(i + 1, 7, 1, 2).clearContent();
+            return { isValid: false, message: "Sesi telah habis (Tidak aktif selama 3 jam). Silakan login kembali." };
+          } else {
+            // --- SESI MASIH AKTIF ---
+            // Perbarui waktu terakhir aktif ke waktu SEKARANG (Reset timer)
+            ssMaster.getRange(i + 1, 8).setValue(now);
+            return { isValid: true };
+          }
+
         } else {
-          return { isValid: false, message: "Sesi telah kedaluwarsa. Akun login di perangkat lain." };
+          return { isValid: false, message: "Sesi telah kedaluwarsa atau akun login di perangkat lain." };
         }
       }
     }
-    // Jika user tidak ditemukan (aneh, tapi handle saja)
     return { isValid: false, message: "Akun tidak ditemukan." };
     
   } catch (e) {
@@ -788,4 +803,40 @@ function saveBulkMasterData(dbId, sheetName, data2D) {
 function cekIzinEmail() {
   var sisa = MailApp.getRemainingDailyQuota();
   console.log("Sisa kuota email hari ini: " + sisa);
+}
+
+/**
+ * Fungsi untuk menghapus semua sesi login dari seluruh akun sekolah.
+ * Peringatan: Semua user yang sedang login akan dipaksa keluar (logout).
+ */
+function forceLogoutAllUsers() {
+  // ID Spreadsheet Master diambil dari variabel global di Kode.gs
+  // Pastikan ID_DB_MASTER sudah didefinisikan di bagian atas file Kode.gs Anda
+  // const ID_DB_MASTER = "1e1V7DQjOWRnx9KETszXwYYDCKAMeUfI3z9In9fM1fxM"; 
+
+  try {
+    const ss = SpreadsheetApp.openById(ID_DB_MASTER);
+    const sheet = ss.getSheetByName("Users");
+    
+    // Cek apakah ada data user (selain header di baris 1)
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      console.log("Tidak ada data user untuk di-reset.");
+      return "Tidak ada user ditemukan.";
+    }
+
+    // Kolom G (Index 7) adalah tempat penyimpanan 'session_token'
+    // Range dimulai dari baris 2, kolom 7, sampai baris terakhir
+    const tokenRange = sheet.getRange(2, 7, lastRow - 1, 1);
+    
+    // Hapus isi kolom token
+    tokenRange.clearContent();
+    
+    console.log("Berhasil menghapus semua sesi. Semua user telah di-logout.");
+    return "Sukses: Semua sesi telah dihapus. Semua akun harus login ulang.";
+    
+  } catch (e) {
+    console.error("Gagal menghapus sesi: " + e.toString());
+    return "Error: " + e.toString();
+  }
 }
