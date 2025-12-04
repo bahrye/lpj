@@ -107,4 +107,130 @@
         box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
         border-radius: 8px;
     }
+
+    /* =========================================
+       NEW AUTHENTICATION STYLES (MODERN)
+       ========================================= */
+    
+    /* Wrapper Full Screen dengan Background Gradient Animasi */
+    .auth-wrapper {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+        background-size: 400% 400%;
+        animation: gradientBG 15s ease infinite;
+        z-index: 2000; /* Pastikan di atas elemen lain saat belum login */
+        overflow-y: auto; /* Agar bisa discroll di HP kecil */
+        padding: 20px 0;
+    }
+
+    @keyframes gradientBG {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+
+    /* Kartu Login Glassmorphism */
+    .auth-card {
+        border: none;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+        transition: transform 0.3s ease;
+    }
+    
+    /* Efek Hover Sedikit pada Kartu */
+    .auth-card:hover {
+        transform: translateY(-5px);
+    }
+
+    /* Icon Lingkaran di Header */
+    .auth-icon {
+        width: 70px;
+        height: 70px;
+        background: linear-gradient(45deg, #0d6efd, #0dcaf0);
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 5px 15px rgba(13, 110, 253, 0.3);
+    }
+
+    /* Kustomisasi Tab Pills */
+    .nav-pills .nav-link {
+        color: #6c757d;
+        transition: all 0.3s;
+    }
+    .nav-pills .nav-link.active {
+        background-color: #0d6efd;
+        color: white;
+        box-shadow: 0 4px 10px rgba(13, 110, 253, 0.3);
+    }
+
+    /* Form Floating Inputs Modern */
+    .form-floating > .form-control {
+        border-radius: 10px;
+        border: 1px solid #e0e0e0;
+        padding-left: 15px;
+    }
+    .form-floating > .form-control:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+    }
+    
+    /* Tombol Utama */
+    .btn-animate {
+        transition: all 0.3s ease;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .btn-animate:hover {
+        transform: scale(1.02);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+
+    /* Animasi Muncul untuk Form */
+    .auth-form {
+        animation: fadeIn 0.5s ease-in-out;
+    }
+    
+    .scale-in {
+        animation: scaleIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .bg-soft-success {
+        background-color: #d1e7dd;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes scaleIn {
+        from { opacity: 0; transform: scale(0.9); }
+        to { opacity: 1; transform: scale(1); }
+    }
+
+    /* RESPONSIVE MOBILE TWEAKS */
+    @media (max-width: 576px) {
+        .auth-wrapper {
+            align-items: flex-start; /* Agar tidak terpotong di layar pendek */
+            padding-top: 40px;
+        }
+        .auth-card {
+            border-radius: 15px;
+            margin: 0 10px; /* Jarak kiri kanan di HP */
+        }
+        .card-body {
+            padding: 2rem !important;
+        }
+    }
 </style>
