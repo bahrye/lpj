@@ -733,8 +733,8 @@
                     <td>${trx.uraian}</td>
                     <td class="text-end fw-bold">${formatRupiah(trx.total_trx)}</td>
                     <td class="text-center">
-                        <button class="btn btn-danger btn-sm" onclick="printLaporan('${trx.id}')">
-                            <i class="fas fa-file-pdf"></i> Cetak PDF (7 Hal)
+                        <button class="btn btn-danger btn-sm" onclick="openModalCetak('${trx.id}')">
+                            <i class="fas fa-print"></i> Cetak PDF
                         </button>
                     </td>
                 `;
@@ -743,9 +743,51 @@
         }).getRiwayatTransaksiGrouped(DB_ID);
     }
 
-    function printLaporan(idTrx) {
-        showConfirm("Generate PDF Laporan Lengkap (7 Halaman)? Proses ini memakan waktu beberapa detik.", function() {
+    // Fungsi 1: Buka Modal & Simpan ID Transaksi
+    function openModalCetak(idTrx) {
+        document.getElementById('cetak_id_trx').value = idTrx;
+        document.getElementById('cetak_jenis').value = 'all'; // Reset ke default
+        new bootstrap.Modal(document.getElementById('modalPilihCetak')).show();
+    }
+
+    // Fungsi 2: Eksekusi saat tombol Download di Modal diklik
+    function prosesCetakPDF() {
+        const idTrx = document.getElementById('cetak_id_trx').value;
+        const jenis = document.getElementById('cetak_jenis').value;
+        
+        // Tutup modal dulu
+        const modalEl = document.getElementById('modalPilihCetak');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        modal.hide();
+        
+        // Panggil fungsi eksekusi
+        executePrint(idTrx, jenis);
+    }
+
+    // Fungsi 3: Panggil Server (Backend)
+    function executePrint(idTrx, jenisCetak) {
+        loader(true); // Tampilkan loading
+        
+        google.script.run.withSuccessHandler(res => {
+            loader(false);
+            if(res.status === 'success') {
+                // Buka PDF di tab baru
+                window.open(res.url, '_blank');
+            } else {
+                showAlert("Gagal: " + res.message, 'danger');
+            }
+        }).generatePDFLaporan(DB_ID, idTrx, jenisCetak);
+    }
+
+    // Update fungsi printLaporan untuk menerima parameter jenisCetak
+    function printLaporan(idTrx, jenisCetak) {
+        let label = "Dokumen";
+        if(jenisCetak === 'all') label = "Laporan Lengkap (7 Hal)";
+        else label = "Halaman " + jenisCetak;
+
+        showConfirm(`Generate PDF ${label}?`, function() {
             loader(true);
+            // Kita kirim parameter tambahan 'jenisCetak' ke backend
             google.script.run.withSuccessHandler(res => {
                 loader(false);
                 if(res.status === 'success') {
@@ -754,7 +796,7 @@
                 } else {
                     showAlert("Gagal: " + res.message, 'danger');
                 }
-            }).generatePDFLaporan(DB_ID, idTrx);
+            }).generatePDFLaporan(DB_ID, idTrx, jenisCetak);
         });
     }
 
