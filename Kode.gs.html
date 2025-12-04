@@ -644,16 +644,17 @@ function terbilang(nilai) {
   return kalimat.trim();
 }
 
-function generatePDFLaporan(dbId, idTrx) {
+function generatePDFLaporan(dbId, idTrx, jenisCetak) {
   try {
-    // 1. Ambil Data Transaksi
     const ss = SpreadsheetApp.openById(dbId);
+    
+    // 1. Ambil Data Transaksi
     const dataTrxRaw = getRiwayatTransaksiGrouped(dbId);
     const trx = dataTrxRaw.find(t => t.id === idTrx);
     if (!trx) throw new Error("Transaksi tidak ditemukan");
 
-    // --- CARI NIP PEMESAN ---
-    trx.nip_pemesan = "-"; // Default
+    // --- Ambil NIP Pemesan ---
+    trx.nip_pemesan = "-"; 
     try {
       const sGuru = ss.getSheetByName("Data_Guru");
       if (sGuru) {
@@ -661,52 +662,35 @@ function generatePDFLaporan(dbId, idTrx) {
         for(let i=1; i<dataGuru.length; i++) {
            if (dataGuru[i][0] === trx.pemesan) {
               let nipVal = dataGuru[i][1];
-              if (nipVal) {
-                 trx.nip_pemesan = String(nipVal).replace(/^'/, "");
-              }
+              if (nipVal) trx.nip_pemesan = String(nipVal).replace(/^'/, "");
               break;
            }
         }
       }
-    } catch(e) { console.log("Gagal ambil NIP Pemesan: " + e); }
+    } catch(e) {}
 
-    // 2. Ambil Data Sekolah & Kop
+    // 2. Data Sekolah & Kop
     const sekolah = getDataSekolah(dbId);
     const kopUrl = getKopSuratUrl(dbId); 
     sekolah.kop_base64 = kopUrl;
     sekolah.kota = sekolah.alamat_ttd || "Kab. Bulukumba"; 
     if (!sekolah.alamat) sekolah.alamat = ""; 
 
-    // 3. Ambil Data Pihak (Toko/Tukang)
+    // 3. Data Pihak (Toko/Tukang)
     let dataToko = {};
     const sToko = ss.getSheetByName("Data_Toko");
-    
     if (sToko) {
       const vals = sToko.getRange(2, 1, sToko.getLastRow(), 6).getValues();
       const found = vals.find(r => r[0] == trx.toko);
       if (found) {
-        dataToko = { 
-          nama: found[0], 
-          jenis: found[1], // TAMBAHAN BARU: Mengambil Jenis Toko
-          alamat: found[2], 
-          telp: found[3], 
-          pemilik: found[4], 
-          kota: found[5] || sekolah.kota 
-        };
+        dataToko = { nama: found[0], jenis: found[1], alamat: found[2], telp: found[3], pemilik: found[4], kota: found[5] || sekolah.kota };
       } else {
          const sTukang = ss.getSheetByName("Data_Tukang");
          if(sTukang) {
             const valsTk = sTukang.getRange(2, 1, sTukang.getLastRow(), 2).getValues();
             const foundTk = valsTk.find(r => r[0] == trx.toko);
             if(foundTk) {
-              dataToko = { 
-                nama: foundTk[0],
-                jenis: "Penyedia Jasa/Tukang", // Default jika tukang
-                alamat: foundTk[1], 
-                telp: "-", 
-                pemilik: foundTk[0], 
-                kota: sekolah.kota 
-              };
+              dataToko = { nama: foundTk[0], jenis: "Penyedia Jasa/Tukang", alamat: foundTk[1], telp: "-", pemilik: foundTk[0], kota: sekolah.kota };
             }
          }
       }
@@ -718,23 +702,37 @@ function generatePDFLaporan(dbId, idTrx) {
     const dataNomor = mapNomor[idTrx] || {};
     const dataTanggal = mapTanggal[idTrx] || {};
 
-    // 5. Gabungkan Template
+    // 5. PENYUSUNAN TEMPLATE BERDASARKAN JENIS CETAK
     var htmlContentString = '<!DOCTYPE html><html><head>';
     htmlContentString += HtmlService.createHtmlOutputFromFile('CetakCSS').getContent();
     htmlContentString += '</head><body>';
     
-    htmlContentString += HtmlService.createTemplateFromFile('Cetak_1_Permintaan').getRawContent();
-    htmlContentString += HtmlService.createTemplateFromFile('Cetak_2_Penawaran').getRawContent();
-    htmlContentString += HtmlService.createTemplateFromFile('Cetak_3_Pemeriksaan').getRawContent();
-    htmlContentString += HtmlService.createTemplateFromFile('Cetak_4_SerahTerima').getRawContent();
-    htmlContentString += HtmlService.createTemplateFromFile('Cetak_5_Faktur').getRawContent();
-    htmlContentString += HtmlService.createTemplateFromFile('Cetak_6_Pembayaran').getRawContent();
-    htmlContentString += HtmlService.createTemplateFromFile('Cetak_7_Kwitansi').getRawContent();
-    
+    // LOGIKA PILIHAN HALAMAN
+    if (jenisCetak === 'all' || !jenisCetak) {
+        // Gabung Semua
+        htmlContentString += HtmlService.createTemplateFromFile('Cetak_1_Permintaan').getRawContent();
+        htmlContentString += HtmlService.createTemplateFromFile('Cetak_2_Penawaran').getRawContent();
+        htmlContentString += HtmlService.createTemplateFromFile('Cetak_3_Pemeriksaan').getRawContent();
+        htmlContentString += HtmlService.createTemplateFromFile('Cetak_4_SerahTerima').getRawContent();
+        htmlContentString += HtmlService.createTemplateFromFile('Cetak_5_Faktur').getRawContent();
+        htmlContentString += HtmlService.createTemplateFromFile('Cetak_6_Pembayaran').getRawContent();
+        htmlContentString += HtmlService.createTemplateFromFile('Cetak_7_Kwitansi').getRawContent();
+    } else {
+        // Ambil Per Halaman
+        switch (String(jenisCetak)) {
+            case '1': htmlContentString += HtmlService.createTemplateFromFile('Cetak_1_Permintaan').getRawContent(); break;
+            case '2': htmlContentString += HtmlService.createTemplateFromFile('Cetak_2_Penawaran').getRawContent(); break;
+            case '3': htmlContentString += HtmlService.createTemplateFromFile('Cetak_3_Pemeriksaan').getRawContent(); break;
+            case '4': htmlContentString += HtmlService.createTemplateFromFile('Cetak_4_SerahTerima').getRawContent(); break;
+            case '5': htmlContentString += HtmlService.createTemplateFromFile('Cetak_5_Faktur').getRawContent(); break;
+            case '6': htmlContentString += HtmlService.createTemplateFromFile('Cetak_6_Pembayaran').getRawContent(); break;
+            case '7': htmlContentString += HtmlService.createTemplateFromFile('Cetak_7_Kwitansi').getRawContent(); break;
+        }
+    }
     htmlContentString += '</body></html>';
 
+    // 6. Inject Data & Helper
     const template = HtmlService.createTemplate(htmlContentString);
-
     template.trx = trx;
     template.items = trx.items;
     template.sekolah = sekolah;
@@ -742,56 +740,36 @@ function generatePDFLaporan(dbId, idTrx) {
     template.nomor = dataNomor;
     template.tanggal = dataTanggal;
 
-    // --- HELPER FORMATTING (BAHASA INDONESIA) ---
     template.fmtRupiah = function(n) { return "Rp " + new Intl.NumberFormat('id-ID').format(n); };
-
     const namaBulanIndo = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-
-    // Fungsi Format Tanggal Indo (Manual agar Mei, Agustus, dll benar)
     template.fmtDate = function(d) {
        if(!d) return "";
-       // Konversi ke Timezone +8 lalu split agar dapat angka pasti
        var dateString = Utilities.formatDate(new Date(d), "GMT+8", "yyyy-MM-dd");
        var parts = dateString.split("-");
-       var year = parts[0];
-       var monthIndex = parseInt(parts[1], 10) - 1; // 0-11
-       var day = parseInt(parts[2], 10); // Hilangkan 0 depan
-       
-       return day + " " + namaBulanIndo[monthIndex] + " " + year;
+       return parseInt(parts[2], 10) + " " + namaBulanIndo[parseInt(parts[1], 10) - 1] + " " + parts[0];
     };
-
     template.hari = function(d) {
       if(!d) return "";
-      // Dapatkan nama hari Inggris dari timezone yang benar
       var dayNameEng = Utilities.formatDate(new Date(d), "GMT+8", "EEEE");
-      var mapHari = {
-        "Sunday": "Minggu", "Monday": "Senin", "Tuesday": "Selasa", "Wednesday": "Rabu",
-        "Thursday": "Kamis", "Friday": "Jumat", "Saturday": "Sabtu"
-      };
+      var mapHari = { "Sunday": "Minggu", "Monday": "Senin", "Tuesday": "Selasa", "Wednesday": "Rabu", "Thursday": "Kamis", "Friday": "Jumat", "Saturday": "Sabtu" };
       return mapHari[dayNameEng] || dayNameEng;
     };
-    
     template.terbilang = terbilang; 
-    
-    // Gunakan fmtDate yang sama untuk terbilangTanggal
     template.terbilangTanggal = template.fmtDate;
 
-    // ---------------------------------------------
-
+    // 7. Generate PDF
     const finalHtml = template.evaluate().getContent();
+    let suffix = (jenisCetak === 'all' || !jenisCetak) ? "LENGKAP" : "HAL_" + jenisCetak;
+    const pdfName = "LPJ_" + trx.toko.replace(/[^a-zA-Z0-9 ]/g, "") + "_" + trx.tanggal + "_" + suffix + ".pdf";
     
-    const blob = Utilities.newBlob(finalHtml, MimeType.HTML).setName("Laporan_" + idTrx + ".pdf");
+    const blob = Utilities.newBlob(finalHtml, MimeType.HTML).setName("Laporan.pdf");
     const folderName = "LPJ_Attachments";
     const folders = DriveApp.getFoldersByName(folderName);
     const folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
-    
-    const pdfName = "LPJ_" + trx.toko.replace(/[^a-zA-Z0-9 ]/g, "") + "_" + trx.tanggal + ".pdf";
     const filePDF = folder.createFile(blob.getAs(MimeType.PDF).setName(pdfName));
-    
     filePDF.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     
     return { status: 'success', url: filePDF.getDownloadUrl().replace("&gd=true","") };
-
   } catch (e) {
     return { status: 'error', message: e.toString() };
   }
